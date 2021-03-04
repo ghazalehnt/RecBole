@@ -1,0 +1,3 @@
+learning_rate choice [0.001, 0.003, 0.01]
+training_neg_sample_num choice [1, 8]
+embedding_size choice [64,128]
