@@ -17,3 +17,4 @@ from recbole.model.general_recommender.ngcf import NGCF
 from recbole.model.general_recommender.pop import Pop
 from recbole.model.general_recommender.spectralcf import SpectralCF
 from recbole.model.general_recommender.mfsimple import MFSimple
+from recbole.model.general_recommender.mlp import MLP
