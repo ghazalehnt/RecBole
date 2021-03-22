@@ -43,17 +43,17 @@ class MFSimple(GeneralRecommender):
         pred = pred + self.item_bias[item] + self.user_bias[user]
         pred = pred + self.bias
         pred = self.sigmoid(pred)
-        
-        reg = self.reg_loss([self.user_embedding.weight, self.user_bias, self.item_embedding.weight, self.item_bias, self.bias])
-        return pred, reg 
+        return pred
 
     def calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
 
-        output, reg = self.forward(user, item)
-        loss = self.loss(output, label) + (self.reg_weight * reg)
+        output = self.forward(user, item)
+        pred_loss = self.loss(output, label)
+        reg_loss = self.reg_loss([self.user_embedding.weight, self.user_bias, self.item_embedding.weight, self.item_bias, self.bias])
+        loss = pred_loss + (self.reg_weight * reg_loss)
         return loss
 
     def predict(self, interaction):
