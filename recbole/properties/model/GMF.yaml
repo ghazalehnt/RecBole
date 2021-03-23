@@ -1,0 +1,4 @@
+embedding_dimension: 128
+weight_decay: 1e-08
+mlp_n_layers: 3
+valid_metric: HIT@10

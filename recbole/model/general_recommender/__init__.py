@@ -24,3 +24,4 @@ from recbole.model.general_recommender.slimelastic import SLIMElastic
 from recbole.model.general_recommender.spectralcf import SpectralCF
 from recbole.model.general_recommender.mfsimple import MFSimple
 from recbole.model.general_recommender.mlp import MLP
+from recbole.model.general_recommender.gmf import GMF
