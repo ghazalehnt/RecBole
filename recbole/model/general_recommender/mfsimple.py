@@ -16,9 +16,9 @@ class MFSimple(GeneralRecommender):
         self.LABEL = config['LABEL_FIELD']
 
         self.embedding_dim = config['embedding_dimension']
-        self.reg_weight = config['reg_weight']
+        # self.reg_weight = config['reg_weight']
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
-        self.logger.info(f"reg_weight = {self.reg_weight}")
+        # self.logger.info(f"reg_weight = {self.reg_weight}")
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_dim, )
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_dim)
@@ -28,7 +28,7 @@ class MFSimple(GeneralRecommender):
 
         self.sigmoid = nn.Sigmoid()
         self.loss = nn.BCELoss()
-        self.reg_loss = RegLoss()
+        # self.reg_loss = RegLoss() # TODO: either completely remove or replace by a custom one that works for others as well. For now we are using weight_decay
         
         self.apply(self._init_weights) # initialize embeddings
 
@@ -52,13 +52,12 @@ class MFSimple(GeneralRecommender):
 
         output = self.forward(user, item)
         pred_loss = self.loss(output, label)
-        reg_loss = self.reg_loss([self.user_embedding.weight, self.user_bias, self.item_embedding.weight, self.item_bias, self.bias])
-        loss = pred_loss + (self.reg_weight * reg_loss)
-        return loss
+        # reg_loss = self.reg_loss([self.user_embedding.weight, self.user_bias, self.item_embedding.weight, self.item_bias, self.bias])
+        # loss = pred_loss + (self.reg_weight * reg_loss)
+        return pred_loss
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         output = self.forward(user, item)
         return output
-

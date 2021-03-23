@@ -1,2 +1,6 @@
-embedding_dimension: 64
-reg_weight: 0.005
+embedding_dimension: 128
+weight_decay: 1e-08
+learning_rate: 0.002
+training_neg_sample_num: 8
+epochs: 256
+valid_metric: Hit@10
