@@ -9,7 +9,7 @@ import os
 
 
 def cross_entropy(pred, soft_targets):
-    logsoftmax = nn.LogSoftmax()
+    logsoftmax = nn.LogSoftmax(dim=1)
     return torch.mean(torch.sum(- soft_targets * logsoftmax(pred), 1))
 
 class JOINTSR(GeneralRecommender):
@@ -28,6 +28,8 @@ class JOINTSR(GeneralRecommender):
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"ff_layers = {self.ff_layers}")
         self.logger.info(f"dropout = {self.dropout}")
+
+        item_description_field = config['item_description_field']
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_dim)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_dim)
@@ -48,12 +50,29 @@ class JOINTSR(GeneralRecommender):
         gensim_cache = ""
         os.environ['GENSIM_DATA_DIR'] = str(gensim_cache)
         # pretrained_embedding_name = "conceptnet-numberbatch-17-06-300"
-        pretrained_embedding_name = "glove-twitter-50" # because the size must be 50 the same as the embedding
+        pretrained_embedding_name = "glove-wiki-gigaword-50" # because the size must be 50 the same as the embedding
         model_path = api.load(pretrained_embedding_name, return_path=True)
         model = gensim.models.KeyedVectors.load_word2vec_format(model_path)
         weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
-        self.word_embedding = nn.Embedding.from_pretrained(weights)
+        self.word_embedding = nn.Embedding.from_pretrained(weights) # TODO, freeze=False)
+        vocab = list(model.vocab)
+
+        # getting the lms:
+        item_features = dataset.get_item_feature()
+        print(item_features)
+        item_descriptions = item_features[item_description_field]  # [0] is PAD
+        self.lm_gt = torch.zeros((len(item_descriptions), len(vocab)))
+        for i in range(1, len(item_descriptions)):
+            for termid in item_descriptions[i]:
+                if termid > 0: # termid=0 is reserved for padding
+                    term = dataset.id2token(item_description_field, termid)
+                    term = str(term)
+                    term = term.lower()
+                    if model.vocab.__contains__(term):
+                        wv_term_index = model.vocab.get(term).index
+                        self.lm_gt[i][wv_term_index] += 1
+        self.logger.info(f"Done with lm_gt construction!")
 
         self.softmax = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
@@ -89,8 +108,8 @@ class JOINTSR(GeneralRecommender):
         loss_rec = self.loss_rec(output_rec, label)
 
         output_ml = self.forward_ml(item)
-        fake = torch.rand(output_ml.shape)
-        label_lm = torch.softmax(fake, dim=1)  # get the language model for itam!!!!
+        labal_lm = self.lm_gt[item]
+        label_lm = torch.softmax(labal_lm, dim=1)  # get the language model for itam!!!!
         loss_ml = self.loss_ml(output_ml, label_lm)
         # loss = loss_rec + loss_ml
         # return loss

@@ -12,4 +12,3 @@ from recbole.model.context_aware_recommender.nfm import NFM
 from recbole.model.context_aware_recommender.pnn import PNN
 from recbole.model.context_aware_recommender.widedeep import WideDeep
 from recbole.model.context_aware_recommender.xdeepfm import xDeepFM
-from recbole.model.context_aware_recommender.jointsr import JOINTSR
