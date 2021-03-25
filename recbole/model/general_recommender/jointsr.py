@@ -118,6 +118,6 @@ class JOINTSR(GeneralRecommender):
     def predict(self, interaction):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
-        output = self.forward(user, item)
+        output = self.forward_rec(user, item)
         return output
 
