@@ -25,11 +25,14 @@ class JOINTSR(GeneralRecommender):
         self.embedding_dim = config['embedding_dimension']
         self.dropout = config["dropout"]
         self.ff_layers = config["ff_layers"]
+        self.alpha = config["alpha"]
+        item_description_fields = config['item_description_fields']
+
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"ff_layers = {self.ff_layers}")
         self.logger.info(f"dropout = {self.dropout}")
-
-        item_description_field = config['item_description_field']
+        self.logger.info(f"alpha = {self.alpha}")
+        self.logger.info(f"item_description_fields = {item_description_fields}")
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_dim)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_dim)
@@ -55,23 +58,24 @@ class JOINTSR(GeneralRecommender):
         model = gensim.models.KeyedVectors.load_word2vec_format(model_path)
         weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
-        self.word_embedding = nn.Embedding.from_pretrained(weights) # TODO, freeze=False)
+        self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
         vocab = list(model.vocab)
 
         # getting the lms:
+        # TODO: this should be changed if we could load fields from other atomic files as well
         item_features = dataset.get_item_feature()
-        print(item_features)
-        item_descriptions = item_features[item_description_field]  # [0] is PAD
-        self.lm_gt = torch.zeros((len(item_descriptions), len(vocab)))
-        for i in range(1, len(item_descriptions)):
-            for termid in item_descriptions[i]:
-                if termid > 0: # termid=0 is reserved for padding
-                    term = dataset.id2token(item_description_field, termid)
-                    term = str(term)
-                    term = term.lower()
-                    if model.vocab.__contains__(term):
-                        wv_term_index = model.vocab.get(term).index
-                        self.lm_gt[i][wv_term_index] += 1
+        self.lm_gt = torch.zeros((len(item_features), len(vocab)))
+        for item_description_field in item_description_fields:
+            item_descriptions = item_features[item_description_field]  # [0] is PAD
+            for i in range(1, len(item_descriptions)):
+                for termid in item_descriptions[i]:
+                    if termid > 0: # termid=0 is reserved for padding
+                        term = dataset.id2token(item_description_field, termid)
+                        term = str(term)
+                        term = term.lower()
+                        if model.vocab.__contains__(term):
+                            wv_term_index = model.vocab.get(term).index
+                            self.lm_gt[i][wv_term_index] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
         self.softmax = nn.Softmax(dim=1)
@@ -110,10 +114,9 @@ class JOINTSR(GeneralRecommender):
         output_ml = self.forward_ml(item)
         labal_lm = self.lm_gt[item]
         label_lm = torch.softmax(labal_lm, dim=1)  # get the language model for itam!!!!
+        #TODO debug here??
         loss_ml = self.loss_ml(output_ml, label_lm)
-        # loss = loss_rec + loss_ml
-        # return loss
-        return loss_rec, loss_ml
+        return loss_rec, self.alpha * loss_ml
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]
