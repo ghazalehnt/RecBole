@@ -98,3 +98,12 @@ class EmbMarginLoss(nn.Module):
             norm_e = torch.sum(embedding ** self.power, dim=1, keepdim=True)
             emb_loss += torch.sum(torch.max(norm_e - cache_one, cache_zero))
         return emb_loss
+
+
+class SoftCrossEntropyLoss(nn.Module):
+    def __init__(self):
+        super(SoftCrossEntropyLoss, self).__init__()
+
+    def forward(self, input, target):
+        logsoftmax = nn.LogSoftmax(dim=1)
+        return torch.mean(torch.sum(- target * logsoftmax(input), 1))

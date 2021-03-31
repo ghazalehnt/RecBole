@@ -1,4 +1,5 @@
 from recbole.model.abstract_recommender import GeneralRecommender
+from recbole.model.loss import SoftCrossEntropyLoss
 from recbole.utils import InputType
 import torch.nn as nn
 import torch
@@ -8,9 +9,7 @@ import gensim.downloader as api
 import os
 
 
-def cross_entropy(pred, soft_targets):
-    logsoftmax = nn.LogSoftmax(dim=1)
-    return torch.mean(torch.sum(- soft_targets * logsoftmax(pred), 1))
+
 
 class JOINTSR(GeneralRecommender):
 
@@ -64,7 +63,8 @@ class JOINTSR(GeneralRecommender):
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
         item_features = dataset.get_item_feature()
-        self.lm_gt = torch.zeros((len(item_features), len(vocab)))
+        self.lm_gt_keys = [[] for i in range(len(item_features))]
+        self.lm_gt_values = [[] for i in range(len(item_features))]
         for item_description_field in item_description_fields:
             item_descriptions = item_features[item_description_field]  # [0] is PAD
             for i in range(1, len(item_descriptions)):
@@ -75,17 +75,28 @@ class JOINTSR(GeneralRecommender):
                         term = term.lower()
                         if model.vocab.__contains__(term):
                             wv_term_index = model.vocab.get(term).index
-                            self.lm_gt[i][wv_term_index] += 1
+                            if wv_term_index not in self.lm_gt_keys[i]:
+                                self.lm_gt_keys[i].append(wv_term_index)
+                                self.lm_gt_values[i].append(1)
+                            else:
+                                idx = self.lm_gt_keys[i].index(wv_term_index)
+                                self.lm_gt_values[i][idx] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
-        self.softmax = nn.Softmax(dim=1)
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
-        self.loss_ml = cross_entropy
+        self.loss_lm = SoftCrossEntropyLoss()
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
+
+    @staticmethod
+    def get_entries(array, keys):
+        ret = []
+        for k in keys:
+            ret.append(array[k])
+        return ret
 
     def forward_rec(self, user, item):
         user_emb = self.user_embedding(user)
@@ -96,12 +107,10 @@ class JOINTSR(GeneralRecommender):
         pred = self.sigmoid(pred).squeeze()
         return pred
 
-    def forward_ml(self, item):
+    def forward_lm(self, item):
         item_emb = self.item_embedding(item)
         pred = torch.matmul(item_emb, self.word_embedding.weight.T)
-        pred = self.softmax(pred).squeeze()
-        return pred
-
+        return pred.squeeze()
 
     def calculate_loss(self, interaction):
         user = interaction[self.USER_ID]
@@ -111,11 +120,18 @@ class JOINTSR(GeneralRecommender):
         output_rec = self.forward_rec(user, item)
         loss_rec = self.loss_rec(output_rec, label)
 
-        output_ml = self.forward_ml(item)
-        labal_lm = self.lm_gt[item]
-        label_lm = torch.softmax(labal_lm, dim=1)  # get the language model for itam!!!!
-        #TODO debug here??
-        loss_ml = self.loss_ml(output_ml, label_lm)
+        output_lm = self.forward_lm(item) # output should be unnormalized counts
+        item_term_keys = self.get_entries(self.lm_gt_keys, item)
+        item_term_vals = self.get_entries(self.lm_gt_values, item)
+        label_lm = torch.zeros(len(item), output_lm.shape[1], device=self.device)
+        for i in range(len(item_term_keys)):
+            for j in range(len(item_term_keys[i])):
+                k = item_term_keys[i][j]
+                v = item_term_vals[i][j]
+                label_lm[i][k] = v
+        label_lm = torch.softmax(label_lm, dim=1)  # labels should be probability distribution
+        loss_ml = self.loss_lm(output_lm, label_lm)
+
         return loss_rec, self.alpha * loss_ml
 
     def predict(self, interaction):
