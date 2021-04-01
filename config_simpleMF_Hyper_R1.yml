@@ -1,4 +1,0 @@
-dataset: ml-100k
-model: MFSimple
-eval_setting: TO_LS,uni100
-reg_weight: 0.001
