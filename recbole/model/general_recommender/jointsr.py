@@ -46,8 +46,10 @@ class JOINTSR(GeneralRecommender):
             mlp_layers.append(nn.Dropout(p=self.dropout))
             mlp_layers.append(nn.Linear(input_size, self.ff_layers[i]))
             mlp_layers.append(nn.ReLU())
+        mlp_layers.append(nn.Dropout(p=self.dropout))
+        mlp_layers.append(torch.nn.Linear(in_features=input_size, out_features=1))
+        mlp_layers.append(nn.Sigmoid())
         self.fc_layers = nn.Sequential(*mlp_layers)
-        self.affine_output = torch.nn.Linear(in_features=input_size, out_features=1)
 
         gensim_cache = ""
         os.environ['GENSIM_DATA_DIR'] = str(gensim_cache)
@@ -58,7 +60,6 @@ class JOINTSR(GeneralRecommender):
         weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
         self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
-        vocab = list(model.vocab)
 
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
@@ -83,7 +84,6 @@ class JOINTSR(GeneralRecommender):
                                 self.lm_gt_values[i][idx] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
-        self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
 
@@ -103,9 +103,7 @@ class JOINTSR(GeneralRecommender):
         item_emb = self.item_embedding(item)
         pred = torch.mul(user_emb, item_emb)
         pred = self.fc_layers(pred)
-        pred = self.affine_output(pred)
-        pred = self.sigmoid(pred).squeeze()
-        return pred
+        return pred.squeeze()
 
     def forward_lm(self, item):
         item_emb = self.item_embedding(item)
