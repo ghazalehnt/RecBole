@@ -59,7 +59,33 @@ class JOINTSR(GeneralRecommender):
         model = gensim.models.KeyedVectors.load_word2vec_format(model_path)
         weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
-        self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
+        vocab = list(model.vocab)
+
+        # Keep only the terms that are used later
+        used_terms = set()
+        item_features = dataset.get_item_feature()
+        for item_description_field in item_description_fields:
+            item_descriptions = item_features[item_description_field]  # [0] is PAD
+            for i in range(1, len(item_descriptions)):
+                for termid in item_descriptions[i]:
+                    if termid > 0: # termid=0 is reserved for padding
+                        term = dataset.id2token(item_description_field, termid)
+                        term = str(term)
+                        term = term.lower()
+                        if model.vocab.__contains__(term):
+                            wv_term_index = model.vocab.get(term).index
+                            used_terms.add(wv_term_index)
+
+        new_term_idx_mapping = {}
+        used_weights = torch.FloatTensor(len(used_terms)+1, self.embedding_dim)
+        new_term_idx = 0
+        for old_term_idx in used_terms:
+            used_weights[new_term_idx] = weights[old_term_idx]
+            new_term_idx_mapping[old_term_idx] = new_term_idx
+            new_term_idx += 1
+        used_weights[new_term_idx] = weights[model.vocab.get("unk").index]
+
+        self.word_embedding = nn.Embedding.from_pretrained(used_weights, freeze=True)
 
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
@@ -75,13 +101,17 @@ class JOINTSR(GeneralRecommender):
                         term = str(term)
                         term = term.lower()
                         if model.vocab.__contains__(term):
-                            wv_term_index = model.vocab.get(term).index
-                            if wv_term_index not in self.lm_gt_keys[i]:
-                                self.lm_gt_keys[i].append(wv_term_index)
-                                self.lm_gt_values[i].append(1)
-                            else:
-                                idx = self.lm_gt_keys[i].index(wv_term_index)
-                                self.lm_gt_values[i][idx] += 1
+                            old_wv_term_index = model.vocab.get(term).index
+                            new_wv_term_index = new_term_idx_mapping[old_wv_term_index]
+                        else:
+                            new_wv_term_index = len(used_weights) - 1 # UNK work
+
+                        if new_wv_term_index not in self.lm_gt_keys[i]:
+                            self.lm_gt_keys[i].append(new_wv_term_index)
+                            self.lm_gt_values[i].append(1)
+                        else:
+                            idx = self.lm_gt_keys[i].index(new_wv_term_index)
+                            self.lm_gt_values[i][idx] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
         self.loss_rec = nn.BCELoss()
