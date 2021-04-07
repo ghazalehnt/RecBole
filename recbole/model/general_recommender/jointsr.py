@@ -46,7 +46,6 @@ class JOINTSR(GeneralRecommender):
             mlp_layers.append(nn.Dropout(p=self.dropout))
             mlp_layers.append(nn.Linear(input_size, self.ff_layers[i]))
             mlp_layers.append(nn.ReLU())
-        mlp_layers.append(nn.Dropout(p=self.dropout))
         mlp_layers.append(torch.nn.Linear(in_features=input_size, out_features=1))
         mlp_layers.append(nn.Sigmoid())
         self.fc_layers = nn.Sequential(*mlp_layers)
@@ -84,7 +83,7 @@ class JOINTSR(GeneralRecommender):
             new_term_idx_mapping[old_term_idx] = new_term_idx
             new_term_idx += 1
         used_weights[new_term_idx] = weights[model.vocab.get("unk").index]
-
+        self.logger.info(f"used pretrained_embedding shape: {used_weights.shape}")
         self.word_embedding = nn.Embedding.from_pretrained(used_weights, freeze=True)
 
         # getting the lms:
@@ -153,11 +152,13 @@ class JOINTSR(GeneralRecommender):
         item_term_vals = self.get_entries(self.lm_gt_values, item)
         label_lm = torch.zeros(len(item), output_lm.shape[1], device=self.device)
         for i in range(len(item_term_keys)):
+            item_desc_len = 0
             for j in range(len(item_term_keys[i])):
                 k = item_term_keys[i][j]
                 v = item_term_vals[i][j]
                 label_lm[i][k] = v
-        label_lm = torch.softmax(label_lm, dim=1)  # labels should be probability distribution
+                item_desc_len += v
+            label_lm[i] /= item_desc_len # labels should be probability distribution
         loss_ml = self.loss_lm(output_lm, label_lm)
 
         return loss_rec, self.alpha * loss_ml
