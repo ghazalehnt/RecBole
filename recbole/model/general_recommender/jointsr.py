@@ -131,7 +131,8 @@ class JOINTSR(GeneralRecommender):
                 v = item_term_vals[i][j]
                 label_lm[i][k] = v
                 item_desc_len += v
-            label_lm[i] /= item_desc_len  # labels should be probability distribution
+            if item_desc_len > 0:
+                label_lm[i] /= item_desc_len  # labels should be probability distribution
         loss_ml = self.loss_lm(output_lm, label_lm)
 
         return loss_rec, self.alpha * loss_ml
