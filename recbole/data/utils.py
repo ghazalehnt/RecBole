@@ -76,6 +76,7 @@ def data_preparation(config, dataset, save=False):
     es = EvalSetting(config)
 
     built_datasets = dataset.build(es)
+    print(len(built_datasets))
     train_dataset, valid_dataset, test_dataset = built_datasets
     phases = ['train', 'valid', 'test']
     sampler = None

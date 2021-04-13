@@ -10,7 +10,6 @@ import os
 
 
 
-
 class JOINTSR(GeneralRecommender):
 
     input_type = InputType.POINTWISE
@@ -50,7 +49,7 @@ class JOINTSR(GeneralRecommender):
         mlp_layers.append(nn.Sigmoid())
         self.fc_layers = nn.Sequential(*mlp_layers)
 
-        gensim_cache = ""
+        gensim_cache = open('gensim_cache_path', 'r').read().strip()
         os.environ['GENSIM_DATA_DIR'] = str(gensim_cache)
         # pretrained_embedding_name = "conceptnet-numberbatch-17-06-300"
         pretrained_embedding_name = "glove-wiki-gigaword-50" # because the size must be 50 the same as the embedding
