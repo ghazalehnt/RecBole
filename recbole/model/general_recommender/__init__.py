@@ -25,3 +25,5 @@ from recbole.model.general_recommender.spectralcf import SpectralCF
 from recbole.model.general_recommender.mfsimple import MFSimple
 from recbole.model.general_recommender.mlp import MLP
 from recbole.model.general_recommender.gmf import GMF
+from recbole.model.general_recommender.jointsr import JOINTSR
+from recbole.model.general_recommender.ncf import NCF

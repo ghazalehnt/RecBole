@@ -25,6 +25,7 @@ class MLP(GeneralRecommender):
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_dim)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_dim)
 
+        # I saw different implementations of this!
         mlp_layers = []
         input_size = self.embedding_dim * 2
         for i in range(0, self.n_layers):

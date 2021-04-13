@@ -1,8 +1,8 @@
 import csv
 import re
 
-originalMLdatasetPath = open(movielense_dataset_path, 'r').read().strip()
-recboleMLdatasetPath = open(recbole_dataset_path, 'r').read().strip()
+originalMLdatasetPath = open('movielense_dataset_path', 'r').read().strip()
+recboleMLdatasetPath = open('recbole_dataset_path', 'r').read().strip()
 infileTags = f"{originalMLdatasetPath}/ml-20m/tags.csv"
 infileMovies = f"{originalMLdatasetPath}/ml-20m/movies.csv"
 dataset = "ml-100k"

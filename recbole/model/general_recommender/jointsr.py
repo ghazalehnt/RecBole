@@ -1,5 +1,5 @@
 from recbole.model.abstract_recommender import GeneralRecommender
-from recbole.model.loss import SoftCrossEntropyLoss
+from recbole.model.loss import SoftCrossEntropyLoss, HierarchicalSoftmax
 from recbole.utils import InputType
 import torch.nn as nn
 import torch
@@ -58,6 +58,7 @@ class JOINTSR(GeneralRecommender):
         weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
         self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
+        vocab = model.wv.vocab
 
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
@@ -87,6 +88,7 @@ class JOINTSR(GeneralRecommender):
 
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
+        self.loss_lm_gs = HierarchicalSoftmax(len(model.vocab), self.embedding_dim)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
@@ -132,9 +134,11 @@ class JOINTSR(GeneralRecommender):
                 item_desc_len += v
             if item_desc_len > 0:
                 label_lm[i] /= item_desc_len  # labels should be probability distribution
-        loss_ml = self.loss_lm(output_lm, label_lm)
+        loss_lm = self.loss_lm(output_lm, label_lm)
 
-        return loss_rec, self.alpha * loss_ml
+        output_lm_hs, loss_lm_hs = self.loss_lm_gs(self.item_embedding(item), label_lm) # it doesn;t really make sense, we are not using the w2v like this!
+
+        return loss_rec, loss_lm, loss_lm_hs
 
     def predict(self, interaction):
         user = interaction[self.USER_ID]

@@ -15,7 +15,7 @@ Common Loss in recommender system
 
 import torch
 import torch.nn as nn
-
+import numpy as np
 
 class BPRLoss(nn.Module):
     """ BPRLoss, based on Bayesian Personalized Ranking
@@ -107,3 +107,62 @@ class SoftCrossEntropyLoss(nn.Module):
     def forward(self, input, target):
         logsoftmax = nn.LogSoftmax(dim=1)
         return torch.mean(torch.sum(- target * logsoftmax(input), 1))
+
+# 2-layer HS https://github.com/leimao/Two-Layer-Hierarchical-Softmax-PyTorch/blob/1b65263308b556b5ae038f866cde925095bc0824/utils.py#L98
+class HierarchicalSoftmax(nn.Module):
+    def __init__(self, ntokens, nout, ntokens_per_class = None):
+        super(HierarchicalSoftmax, self).__init__()
+
+        # Parameters
+        self.ntokens = ntokens
+        self.nout = nout
+
+        if ntokens_per_class is None:
+            ntokens_per_class = int(np.ceil(np.sqrt(ntokens)))
+
+        self.ntokens_per_class = ntokens_per_class
+
+        self.nclasses = int(np.ceil(self.ntokens * 1. / self.ntokens_per_class))
+        self.ntokens_actual = self.nclasses * self.ntokens_per_class
+
+        print(self.ntokens)
+        print(self.ntokens_per_class)
+        print(self.nclasses)
+        print(self.ntokens_actual)
+
+
+        self.layer_top_W = nn.Parameter(torch.FloatTensor(self.nout, self.nclasses), requires_grad=True)
+        self.layer_top_b = nn.Parameter(torch.FloatTensor(self.nclasses), requires_grad=True)
+
+        self.layer_bottom_W = nn.Parameter(torch.FloatTensor(self.nclasses, self.nout, self.ntokens_per_class), requires_grad=True)
+        self.layer_bottom_b = nn.Parameter(torch.FloatTensor(self.nclasses, self.ntokens_per_class), requires_grad=True)
+
+        self.softmax = nn.Softmax(dim=1)
+
+        self.init_weights()
+
+    def init_weights(self):
+
+        initrange = 0.1
+        self.layer_top_W.data.uniform_(-initrange, initrange)
+        self.layer_top_b.data.fill_(0)
+        self.layer_bottom_W.data.uniform_(-initrange, initrange)
+        self.layer_bottom_b.data.fill_(0)
+
+    def forward(self, inputs, labels):
+        batch_size, d = inputs.size()
+
+        if labels is not None:
+            label_position_top = labels / self.ntokens_per_class
+            label_position_bottom = labels % self.ntokens_per_class
+
+            layer_top_logits = torch.matmul(inputs, self.layer_top_W) + self.layer_top_b
+            layer_top_probs = self.softmax(layer_top_logits)
+
+            layer_bottom_logits = torch.squeeze(torch.bmm(torch.unsqueeze(inputs, dim=1), self.layer_bottom_W[label_position_top]), dim=1) + self.layer_bottom_b[label_position_top]
+            layer_bottom_probs = self.softmax(layer_bottom_logits)
+
+            target_probs = layer_top_probs[torch.arange(batch_size).long(), label_position_top] * layer_bottom_probs[torch.arange(batch_size).long(), label_position_bottom]
+            loss = -torch.mean(torch.log(target_probs))
+
+            return target_probs, loss
