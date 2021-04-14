@@ -1,8 +1,5 @@
 embedding_dimension: 50
 weight_decay: 1e-08
-lr: 0.0004
 dropout: 0.8
 ff_layers: [50, 50]
 training_neg_sample_num: 4
-item_description_fields: [tags]
-alpha: 1
