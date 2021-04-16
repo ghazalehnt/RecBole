@@ -28,3 +28,4 @@ from recbole.model.general_recommender.gmf import GMF
 from recbole.model.general_recommender.jointsr import JOINTSR
 from recbole.model.general_recommender.ncf import NCF
 from recbole.model.general_recommender.jointsrfc import JOINTSRFC
+from recbole.model.general_recommender.jointsrmf import JOINTSRMF

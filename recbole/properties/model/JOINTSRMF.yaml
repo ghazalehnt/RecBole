@@ -1,0 +1,6 @@
+embedding_dimension: 50
+weight_decay: 1e-08
+learning_rate: 0.002
+training_neg_sample_num: 8
+item_description_fields: [tags]
+alpha: 1
