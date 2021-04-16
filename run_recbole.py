@@ -18,8 +18,14 @@ if __name__ == '__main__':
     parser.add_argument('--model', '-m', type=str, default=None, help='name of models')
     parser.add_argument('--dataset', '-d', type=str, default=None, help='name of datasets')
     parser.add_argument('--config_files', type=str, default=None, help='config files')
+    parser.add_argument('--alpha', type=float, default=None, help='alpha for jsr')
 
     args, _ = parser.parse_known_args()
 
     config_file_list = args.config_files.strip().split(' ') if args.config_files else None
-    run_recbole(model=args.model, dataset=args.dataset, config_file_list=config_file_list)
+
+    config_dict = {}
+    if args.alpha is not None:
+        config_dict['alpha'] = args.alpha
+
+    run_recbole(model=args.model, dataset=args.dataset, config_file_list=config_file_list, config_dict=config_dict)
