@@ -1,5 +1,5 @@
 from recbole.model.abstract_recommender import GeneralRecommender
-from recbole.model.loss import SoftCrossEntropyLoss#, HierarchicalSoftmax
+from recbole.model.loss import SoftCrossEntropyLoss, SoftCrossEntropyLossByNegSampling  # , HierarchicalSoftmax
 from recbole.utils import InputType
 import torch.nn as nn
 import torch
@@ -8,12 +8,12 @@ import gensim
 import gensim.downloader as api
 import os
 
-class JOINTSRMF(GeneralRecommender):
+class JOINTSRMFNEGS(GeneralRecommender):
 
     input_type = InputType.POINTWISE
 
     def __init__(self, config, dataset):
-        super(JOINTSRMF, self).__init__(config, dataset)
+        super(JOINTSRMFNEGS, self).__init__(config, dataset)
 
         # load dataset info
         self.LABEL = config['LABEL_FIELD']
@@ -22,9 +22,12 @@ class JOINTSRMF(GeneralRecommender):
         self.alpha = config["alpha"]
         item_description_fields = config['item_description_fields']
 
+        LM_neg_samples = config["LM_neg_samples"]
+
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"alpha = {self.alpha}")
         self.logger.info(f"item_description_fields = {item_description_fields}")
+        self.logger.info(f"LM_neg_samples = {LM_neg_samples}")
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_dim)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_dim)
@@ -45,6 +48,7 @@ class JOINTSRMF(GeneralRecommender):
 
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
+        noise_dist = {} # This is the noise distribution!
         item_features = dataset.get_item_feature()
         self.lm_gt_keys = [[] for i in range(len(item_features))]
         self.lm_gt_values = [[] for i in range(len(item_features))]
@@ -67,14 +71,14 @@ class JOINTSRMF(GeneralRecommender):
                         else:
                             idx = self.lm_gt_keys[i].index(wv_term_index)
                             self.lm_gt_values[i][idx] += 1
+                        if wv_term_index not in noise_dist:
+                            noise_dist[wv_term_index] = 0
+                        noise_dist[wv_term_index] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
-        self.loss_lm = SoftCrossEntropyLoss()
-
-        # make the neg sample distribution for the 
-        dataset.num('tags')
+        self.loss_lm = SoftCrossEntropyLossByNegSampling(LM_neg_samples, noise_dist, 0.75) # dist to the power of 3/4
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
@@ -112,21 +116,8 @@ class JOINTSRMF(GeneralRecommender):
         output_lm = self.forward_lm(item) # output should be unnormalized counts
         item_term_keys = self.get_entries(self.lm_gt_keys, item)
         item_term_vals = self.get_entries(self.lm_gt_values, item)
-        # when using the softmax loss, we need to have probability distrubution for labels:
-        label_lm = torch.zeros(len(item), output_lm.shape[1], device=self.device)
-        for i in range(len(item_term_keys)):
-            item_desc_len = 0
-            for j in range(len(item_term_keys[i])):
-                k = item_term_keys[i][j]
-                v = item_term_vals[i][j]
-                label_lm[i][k] = v
-                item_desc_len += v
-            if item_desc_len > 0:
-                label_lm[i] /= item_desc_len  # labels should be probability distribution
-        loss_lm = self.loss_lm(output_lm, label_lm)
 
-        # # when using negative sampling loss:
-        # loss_lm = self.loss_lm(output_lm, item_term_keys, item_term_vals)
+        loss_lm = self.loss_lm(output_lm, item_term_keys, item_term_vals)
 
         return loss_rec, self.alpha * loss_lm
 

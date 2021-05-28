@@ -104,9 +104,39 @@ class SoftCrossEntropyLoss(nn.Module):
     def __init__(self):
         super(SoftCrossEntropyLoss, self).__init__()
 
-    def forward(self, input, target):
+    def forward(self, output, target):
         logsoftmax = nn.LogSoftmax(dim=1)
-        return torch.mean(torch.sum(- target * logsoftmax(input), 1))
+        return torch.mean(torch.sum(- target * logsoftmax(output), 1))
+
+
+class SoftCrossEntropyLossByNegSampling(nn.Module):
+    def __init__(self, num_neg_samples, unig_dist, alpha): # TODO  neg_sampling_dis uniform, P_w, P_w to the power of sth
+        self.num_neg_samples = num_neg_samples
+        self.noise_dist = {key: val ** alpha for key, val in unig_dist.items()}
+        self.noise_dist_Z = sum(self.noise_dist.values())
+        super(SoftCrossEntropyLossByNegSampling, self).__init__()
+
+    def forward(self, output, target_keys, target_values):
+        batch_sum = 0
+        for idx in range(0, len(output)):
+            vals = torch.tensor(target_values[idx])
+            s1 = torch.sum((vals / torch.sum(vals) * torch.log(torch.sigmoid(output[idx][target_keys[idx]]))))
+
+            neg_samples = self.sample_negs(len(target_keys[idx]), target_keys[idx])
+            s2 = torch.sum(torch.log(torch.sigmoid(-1 * output[idx][neg_samples])))
+
+            batch_sum += s1 + s2
+        return batch_sum/output.shape[0]
+
+    def sample_negs(self, num_pos, item_lm_keys):
+        num_samples = num_pos * self.num_neg_samples
+        noise_dist = self.noise_dist.copy()
+        Z = self.noise_dist_Z
+        for ti in item_lm_keys:
+            Z -= noise_dist[ti]
+            noise_dist[ti] = 0
+        samples = np.random.choice(list(noise_dist.keys()), num_samples, replace=False, p=np.divide(list(noise_dist.values()), Z))
+        return samples
 
 # # 2-layer HS https://github.com/leimao/Two-Layer-Hierarchical-Softmax-PyTorch/blob/1b65263308b556b5ae038f866cde925095bc0824/utils.py#L98
 # class HierarchicalSoftmax(nn.Module):
