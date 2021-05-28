@@ -134,11 +134,11 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
         for item_idx in range(m):
             noise_dist = self.noise_dist.copy()
             Z = self.noise_dist_Z
-            for i in range(n):
-                if target[item_idx][i] > 0:
-                    Z -= noise_dist[i]
-                    noise_dist[i] = 0
-            samples = np.random.choice(list(noise_dist.keys()), num_samples, replace=False, p=np.divide(list(noise_dist.values()), Z))
+            for v_idx in range(n):
+                if target[item_idx][v_idx] > 0:
+                    Z -= noise_dist[v_idx]
+                    noise_dist[v_idx] = 0
+            samples = np.random.choice(list(noise_dist.keys()), num_samples[item_idx], replace=False, p=np.divide(list(noise_dist.values()), Z))
             for sample in samples:
                 all_samples[item_idx][sample] = 1
                 neg_samples_cnt[item_idx] += 1
