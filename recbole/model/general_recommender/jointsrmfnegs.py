@@ -78,7 +78,7 @@ class JOINTSRMFNEGS(GeneralRecommender):
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
-        self.loss_lm = SoftCrossEntropyLossByNegSampling(LM_neg_samples, noise_dist, 0.75) # dist to the power of 3/4
+        self.loss_lm = SoftCrossEntropyLossByNegSampling(LM_neg_samples, noise_dist, 0.75, self.device) # dist to the power of 3/4
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
