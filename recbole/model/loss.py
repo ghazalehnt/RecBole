@@ -117,27 +117,31 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
         self.device = device
         super(SoftCrossEntropyLossByNegSampling, self).__init__()
 
-    def forward(self, output, target_keys, target_values):
-        batch_sum = 0
-        for idx in range(0, len(output)):
-            vals = torch.tensor(target_values[idx], device=self.device)
-            s1 = torch.sum((vals / torch.sum(vals) * torch.log(torch.sigmoid(output[idx][target_keys[idx]]))))
+    def forward(self, output, target, target_cnt):
+        s1 = torch.sum(torch.mul(target/target_cnt, torch.sigmoid(output)), 1)
+        neg_samples, neg_samples_cnt = self.sample_negs(target)
+        s2 = torch.sum(torch.mul(neg_samples / neg_samples_cnt, torch.sigmoid(-1 * output)), 1)
 
-            neg_samples = self.sample_negs(len(target_keys[idx]), target_keys[idx])
-            s2 = torch.sum(torch.log(torch.sigmoid(-1 * output[idx][neg_samples])))
+        total = torch.mean(s1 + s2)
+        return total
 
-            batch_sum += s1 + s2
-        return batch_sum/output.shape[0]
-
-    def sample_negs(self, num_pos, item_lm_keys):
+    def sample_negs(self, target):
+        num_pos = torch.count_nonzero(target, 1)
         num_samples = num_pos * self.num_neg_samples
-        noise_dist = self.noise_dist.copy()
-        Z = self.noise_dist_Z
-        for ti in item_lm_keys:
-            Z -= noise_dist[ti]
-            noise_dist[ti] = 0
-        samples = np.random.choice(list(noise_dist.keys()), num_samples, replace=False, p=np.divide(list(noise_dist.values()), Z))
-        return samples
+        all_samples = torch.zeros(target.shape)
+        neg_samples_cnt = torch.zeros(target.shape[0])
+        for item_idx in range(target.shape[0]):
+            noise_dist = self.noise_dist.copy()
+            Z = self.noise_dist_Z
+            for i in range(target[item_idx]):
+                if target[item_idx][i] > 0:
+                    Z -= noise_dist[i]
+                    noise_dist[i] = 0
+            samples = np.random.choice(list(noise_dist.keys()), num_samples, replace=False, p=np.divide(list(noise_dist.values()), Z))
+            for sample in samples:
+                all_samples[item_idx][sample] = 1
+                neg_samples_cnt[item_idx] += 1
+        return all_samples
 
 # # 2-layer HS https://github.com/leimao/Two-Layer-Hierarchical-Softmax-PyTorch/blob/1b65263308b556b5ae038f866cde925095bc0824/utils.py#L98
 # class HierarchicalSoftmax(nn.Module):
