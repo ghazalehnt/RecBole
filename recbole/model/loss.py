@@ -126,14 +126,15 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
         return total
 
     def sample_negs(self, target):
+        m, n = target.shape
         num_pos = torch.count_nonzero(target, 1)
         num_samples = num_pos * self.num_neg_samples
-        all_samples = torch.zeros(target.shape)
-        neg_samples_cnt = torch.zeros(target.shape[0])
-        for item_idx in range(target.shape[0]):
+        all_samples = torch.zeros((m,n))
+        neg_samples_cnt = torch.zeros(m)
+        for item_idx in range(m):
             noise_dist = self.noise_dist.copy()
             Z = self.noise_dist_Z
-            for i in range(target[item_idx]):
+            for i in range(n):
                 if target[item_idx][i] > 0:
                     Z -= noise_dist[i]
                     noise_dist[i] = 0
