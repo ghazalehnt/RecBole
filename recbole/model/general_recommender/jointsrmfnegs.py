@@ -50,8 +50,8 @@ class JOINTSRMFNEGS(GeneralRecommender):
         # TODO: this should be changed if we could load fields from other atomic files as well
         noise_dist = {} # This is the noise distribution!
         item_features = dataset.get_item_feature()
-        self.lm_gt_keys = [[] for i in range(len(item_features))]
-        self.lm_gt_values = [[] for i in range(len(item_features))]
+        self.lm_gt = torch.zeros((len(item_features), len(model.vocab)), device=self.device)
+        self.lm_gt_cnt = torch.zeros((len(item_features), 1), device=self.device)
         for item_description_field in item_description_fields:
             item_descriptions = item_features[item_description_field]  # [0] is PAD
             for i in range(1, len(item_descriptions)):
@@ -65,12 +65,8 @@ class JOINTSRMFNEGS(GeneralRecommender):
                         else:
                             wv_term_index = model.vocab.get("unk").index
 
-                        if wv_term_index not in self.lm_gt_keys[i]:
-                            self.lm_gt_keys[i].append(wv_term_index)
-                            self.lm_gt_values[i].append(1)
-                        else:
-                            idx = self.lm_gt_keys[i].index(wv_term_index)
-                            self.lm_gt_values[i][idx] += 1
+                        self.lm_gt[i][wv_term_index] += 1
+                        self.lm_gt_cnt[i] += 1
                         if wv_term_index not in noise_dist:
                             noise_dist[wv_term_index] = 0
                         noise_dist[wv_term_index] += 1
@@ -85,11 +81,15 @@ class JOINTSRMFNEGS(GeneralRecommender):
             normal_(module.weight.data, mean=0.0, std=0.01)
 
     @staticmethod
-    def get_entries(array, keys):
-        ret = []
-        for k in keys:
-            ret.append(array[k])
-        return ret
+    def get_entries(array, keys, tensor=False, device=None):
+        if not tensor:
+            ret = []
+            for k in keys:
+                ret.append(array[k])
+            return ret
+        else:
+            ret = torch.tensor(device=device)
+
 
     def forward_rec(self, user, item):
         user_emb = self.user_embedding(user)
@@ -114,10 +114,8 @@ class JOINTSRMFNEGS(GeneralRecommender):
         loss_rec = self.loss_rec(output_rec, label)
 
         output_lm = self.forward_lm(item) # output should be unnormalized counts
-        item_term_keys = self.get_entries(self.lm_gt_keys, item)
-        item_term_vals = self.get_entries(self.lm_gt_values, item)
 
-        loss_lm = self.loss_lm(output_lm, item_term_keys, item_term_vals)
+        loss_lm = self.loss_lm(output_lm, self.lm_gt[item], self.lm_gt_cnt[item])
 
         return loss_rec, self.alpha * loss_lm
 
