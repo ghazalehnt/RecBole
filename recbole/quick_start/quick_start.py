@@ -42,7 +42,7 @@ def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=Non
     logger.info(dataset)
 
     # dataset splitting
-    train_data, valid_data, test_data = data_preparation(config, dataset, True)
+    train_data, valid_data, test_data = data_preparation(config, dataset)
 
     # model loading and initialization
     model = get_model(config['model'])(config, train_data).to(config['device'])
