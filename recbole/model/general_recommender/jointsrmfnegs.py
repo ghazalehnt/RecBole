@@ -73,7 +73,7 @@ class JOINTSRMFNEGS(GeneralRecommender):
         # self.logger.info(f"Done with lm_gt construction!")
 
         noise_dist = {}  # This is the noise distribution!
-        self.lm_gt = torch.zeros((self.n_items, len(model.key_to_index)), device=self.device)
+        self.lm_gt = torch.zeros((self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.uint8)
         item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
         item_desc_fields = []
         if "item_description" in item_description_fields:
