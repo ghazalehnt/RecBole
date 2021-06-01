@@ -42,45 +42,49 @@ class JOINTSRMFNEGS(GeneralRecommender):
         pretrained_embedding_name = "glove-wiki-gigaword-50" # because the size must be 50 the same as the embedding
         model_path = api.load(pretrained_embedding_name, return_path=True)
         model = gensim.models.KeyedVectors.load_word2vec_format(model_path)
+        self.vocab_size = len(model.key_to_index)
         weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
         self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
 
-        # getting the lms:
-        # TODO: this should be changed if we could load fields from other atomic files as well
-        # noise_dist = {} # This is the noise distribution!
-        # item_features = dataset.get_item_feature()
-        # self.lm_gt = torch.zeros((len(item_features), len(model.vocab)), device=self.device)
-        # self.lm_gt_cnt = torch.zeros((len(item_features), 1), device=self.device)
-        # for item_description_field in item_description_fields:
-        #     item_descriptions = item_features[item_description_field]  # [0] is PAD
-        #     for i in range(1, len(item_descriptions)):
-        #         for termid in item_descriptions[i]:
-        #             if termid > 0: # termid=0 is reserved for padding
-        #                 term = dataset.id2token(item_description_field, termid)
-        #                 term = str(term)
-        #                 term = term.lower()
-        #                 if model.vocab.__contains__(term):
-        #                     wv_term_index = model.vocab.get(term).index
+         # tHIS IS NOT POSSIBLE BC OF THE MEMORY SIZE!!!
+        # noise_dist = {}  # This is the noise distribution!
+        # self.lm_gt = torch.zeros((self.n_items, len(model.key_to_index)), device=self.device)
+        # item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+        # item_desc_fields = []
+        # if "item_description" in item_description_fields:
+        #     item_desc_fields.append(3)
+        # if "item_genres" in item_description_fields:
+        #     item_desc_fields.append(4)
+        # #TODO other fields? e.g. review? have to write another piece of code
+        # with open(item_LM_file, 'r') as infile:
+        #     next(infile)
+        #     for line in infile:
+        #         split = line.split("\t")
+        #         item_id = dataset.token2id("item_id", split[0])
+        #         for fi in item_desc_fields:
+        #             desc = split[fi]
+        #             for term in desc.split():
+        #                 if term in model.key_to_index:
+        #                     wv_term_index = model.key_to_index[term]
         #                 else:
-        #                     wv_term_index = model.vocab.get("unk").index
-        #
-        #                 self.lm_gt[i][wv_term_index] += 1
-        #                 self.lm_gt_cnt[i] += 1
+        #                     wv_term_index = model.key_to_index["unk"]
+        #                 self.lm_gt[item_id][wv_term_index] += 1
         #                 if wv_term_index not in noise_dist:
         #                     noise_dist[wv_term_index] = 0
         #                 noise_dist[wv_term_index] += 1
         # self.logger.info(f"Done with lm_gt construction!")
 
-        noise_dist = {}  # This is the noise distribution!
-        self.lm_gt = torch.zeros((self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.uint8)
+        noise_dist = {}
+        self.lm_gt_keys = [[] for i in range(self.n_items)]
+        self.lm_gt_values = [[] for i in range(self.n_items)]
         item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
         if "item_genres" in item_description_fields:
             item_desc_fields.append(4)
-        #TODO other fields? e.g. review? have to write another piece of code
+        # TODO other fields? e.g. review? have to write another piece of code
         with open(item_LM_file, 'r') as infile:
             next(infile)
             for line in infile:
@@ -93,7 +97,12 @@ class JOINTSRMFNEGS(GeneralRecommender):
                             wv_term_index = model.key_to_index[term]
                         else:
                             wv_term_index = model.key_to_index["unk"]
-                        self.lm_gt[item_id][wv_term_index] += 1
+                        if wv_term_index not in self.lm_gt_keys[item_id]:
+                            self.lm_gt_keys[item_id].append(wv_term_index)
+                            self.lm_gt_values[item_id].append(1)
+                        else:
+                            idx = self.lm_gt_keys[item_id].index(wv_term_index)
+                            self.lm_gt_values[item_id][idx] += 1
                         if wv_term_index not in noise_dist:
                             noise_dist[wv_term_index] = 0
                         noise_dist[wv_term_index] += 1
@@ -107,16 +116,12 @@ class JOINTSRMFNEGS(GeneralRecommender):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
 
-    @staticmethod
-    def get_entries(array, keys, tensor=False, device=None):
-        if not tensor:
-            ret = []
-            for k in keys:
-                ret.append(array[k])
-            return ret
-        else:
-            ret = torch.tensor(device=device)
-
+    def get_lms(self, keys):
+        ret = torch.zeros((len(keys), self.vocab_size), device=self.device)
+        for k in range(len(keys)):
+            for j in range(len(self.lm_gt_keys[k])):
+                ret[k][self.lm_gt_keys[k][j]] = self.lm_gt_keys[k][j]
+        return ret
 
     def forward_rec(self, user, item):
         user_emb = self.user_embedding(user)
@@ -141,7 +146,7 @@ class JOINTSRMFNEGS(GeneralRecommender):
         loss_rec = self.loss_rec(output_rec, label)
 
         output_lm = self.forward_lm(item)# output should be unnormalized counts
-        loss_lm = self.loss_lm(output_lm, self.lm_gt[item])
+        loss_lm = self.loss_lm(output_lm, self.get_lms(item))
         print(loss_lm)
 
         return loss_rec, self.alpha * loss_lm
