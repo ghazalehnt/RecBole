@@ -79,7 +79,8 @@ class JOINTSRMF(GeneralRecommender):
         if "item_genres" in item_description_fields:
             item_desc_fields.append(4)
         #TODO other fields? e.g. review? have to write another piece of code
-        with open(item_LM_file) as infile:
+        with open(item_LM_file, 'r') as infile:
+            next(infile)
             for line in infile:
                 split = line.split("\t")
                 item_id = dataset.token2id("item_id", split[0])
