@@ -72,7 +72,7 @@ class JOINTSRMF(GeneralRecommender):
         # since we cannot load the data initially due to the size!!! I am reading the LM here:
         self.lm_gt_keys = [[] for i in range(self.n_items)]
         self.lm_gt_values = [[] for i in range(self.n_items)]
-        item_LM_file = os.path.join(dataset.dataset_path, f"{dataset.dataset_name}.item")
+        item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
