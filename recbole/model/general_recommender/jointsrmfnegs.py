@@ -74,7 +74,6 @@ class JOINTSRMFNEGS(GeneralRecommender):
 
         noise_dist = {}  # This is the noise distribution!
         self.lm_gt = torch.zeros((self.n_items, len(model.key_to_index)), device=self.device)
-        self.lm_gt_cnt = torch.zeros((self.n_items, 1), device=self.device)
         item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
         item_desc_fields = []
         if "item_description" in item_description_fields:
@@ -95,7 +94,6 @@ class JOINTSRMFNEGS(GeneralRecommender):
                         else:
                             wv_term_index = model.key_to_index["unk"]
                         self.lm_gt[item_id][wv_term_index] += 1
-                        self.lm_gt_cnt[item_id] += 1
                         if wv_term_index not in noise_dist:
                             noise_dist[wv_term_index] = 0
                         noise_dist[wv_term_index] += 1
@@ -143,7 +141,7 @@ class JOINTSRMFNEGS(GeneralRecommender):
         loss_rec = self.loss_rec(output_rec, label)
 
         output_lm = self.forward_lm(item)# output should be unnormalized counts
-        loss_lm = self.loss_lm(output_lm, self.lm_gt[item], self.lm_gt_cnt[item])
+        loss_lm = self.loss_lm(output_lm, self.lm_gt[item])
         print(loss_lm)
 
         return loss_rec, self.alpha * loss_lm

@@ -110,7 +110,7 @@ class SoftCrossEntropyLoss(nn.Module):
 
 
 class SoftCrossEntropyLossByNegSampling(nn.Module):
-    def __init__(self, num_neg_samples, unigram_dist, alpha, device): # TODO  neg_sampling_dis uniform, P_w, P_w to the power of sth
+    def __init__(self, num_neg_samples, unigram_dist, alpha, device):
         self.num_neg_samples = num_neg_samples
         noise_dist = {key: val ** alpha for key, val in unigram_dist.items()}
         Z = sum(noise_dist.values())
@@ -118,8 +118,8 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
         self.device = device
         super(SoftCrossEntropyLossByNegSampling, self).__init__()
 
-    def forward(self, output, target, target_cnt):
-        #s1 = torch.sum(torch.mul(target/target_cnt, torch.sigmoid(output)), 1)
+    def forward(self, output, target):
+        #s1 = torch.sum(torch.mul(target.T.div(target.sum(1)), torch.sigmoid(output)), 1)
         s1 = torch.sum(torch.mul(target, torch.log(torch.sigmoid(output))), 1)
         neg_samples = self.sample_negs(target)
         #s2 = torch.sum(torch.mul(neg_samples.T.div(neg_samples.sum(1)).T, torch.log(torch.sigmoid(-1 * output))), 1)
