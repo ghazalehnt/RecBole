@@ -147,7 +147,6 @@ class JOINTSRMFNEGS(GeneralRecommender):
 
         output_lm = self.forward_lm(item)# output should be unnormalized counts
         loss_lm = self.loss_lm(output_lm, self.get_lms(item))
-        print(loss_lm)
 
         return loss_rec, self.alpha * loss_lm
 
