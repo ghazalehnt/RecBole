@@ -48,25 +48,54 @@ class JOINTSRMFNEGS(GeneralRecommender):
 
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
-        noise_dist = {} # This is the noise distribution!
-        item_features = dataset.get_item_feature()
-        self.lm_gt = torch.zeros((len(item_features), len(model.vocab)), device=self.device)
-        self.lm_gt_cnt = torch.zeros((len(item_features), 1), device=self.device)
-        for item_description_field in item_description_fields:
-            item_descriptions = item_features[item_description_field]  # [0] is PAD
-            for i in range(1, len(item_descriptions)):
-                for termid in item_descriptions[i]:
-                    if termid > 0: # termid=0 is reserved for padding
-                        term = dataset.id2token(item_description_field, termid)
-                        term = str(term)
-                        term = term.lower()
-                        if model.vocab.__contains__(term):
-                            wv_term_index = model.vocab.get(term).index
-                        else:
-                            wv_term_index = model.vocab.get("unk").index
+        # noise_dist = {} # This is the noise distribution!
+        # item_features = dataset.get_item_feature()
+        # self.lm_gt = torch.zeros((len(item_features), len(model.vocab)), device=self.device)
+        # self.lm_gt_cnt = torch.zeros((len(item_features), 1), device=self.device)
+        # for item_description_field in item_description_fields:
+        #     item_descriptions = item_features[item_description_field]  # [0] is PAD
+        #     for i in range(1, len(item_descriptions)):
+        #         for termid in item_descriptions[i]:
+        #             if termid > 0: # termid=0 is reserved for padding
+        #                 term = dataset.id2token(item_description_field, termid)
+        #                 term = str(term)
+        #                 term = term.lower()
+        #                 if model.vocab.__contains__(term):
+        #                     wv_term_index = model.vocab.get(term).index
+        #                 else:
+        #                     wv_term_index = model.vocab.get("unk").index
+        #
+        #                 self.lm_gt[i][wv_term_index] += 1
+        #                 self.lm_gt_cnt[i] += 1
+        #                 if wv_term_index not in noise_dist:
+        #                     noise_dist[wv_term_index] = 0
+        #                 noise_dist[wv_term_index] += 1
+        # self.logger.info(f"Done with lm_gt construction!")
 
-                        self.lm_gt[i][wv_term_index] += 1
-                        self.lm_gt_cnt[i] += 1
+        noise_dist = {}  # This is the noise distribution!
+        self.lm_gt = torch.zeros((self.n_items, len(model.key_to_index)), device=self.device)
+        self.lm_gt_cnt = torch.zeros((self.n_items, 1), device=self.device)
+        item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+        item_desc_fields = []
+        if "item_description" in item_description_fields:
+            item_desc_fields.append(3)
+        if "item_genres" in item_description_fields:
+            item_desc_fields.append(4)
+        #TODO other fields? e.g. review? have to write another piece of code
+        with open(item_LM_file, 'r') as infile:
+            next(infile)
+            for line in infile:
+                split = line.split("\t")
+                item_id = dataset.token2id("item_id", split[0])
+                for fi in item_desc_fields:
+                    desc = split[fi]
+                    for term in desc.split():
+                        if term in model.key_to_index:
+                            wv_term_index = model.key_to_index[term]
+                        else:
+                            wv_term_index = model.key_to_index["unk"]
+                        self.lm_gt[item_id][wv_term_index] += 1
+                        self.lm_gt_cnt[item_id] += 1
                         if wv_term_index not in noise_dist:
                             noise_dist[wv_term_index] = 0
                         noise_dist[wv_term_index] += 1
@@ -113,9 +142,9 @@ class JOINTSRMFNEGS(GeneralRecommender):
         output_rec = self.forward_rec(user, item)
         loss_rec = self.loss_rec(output_rec, label)
 
-        output_lm = self.forward_lm(item) # output should be unnormalized counts
-
+        output_lm = self.forward_lm(item)# output should be unnormalized counts
         loss_lm = self.loss_lm(output_lm, self.lm_gt[item], self.lm_gt_cnt[item])
+        print(loss_lm)
 
         return loss_rec, self.alpha * loss_lm
 
