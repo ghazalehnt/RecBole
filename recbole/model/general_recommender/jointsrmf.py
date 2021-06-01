@@ -103,9 +103,6 @@ class JOINTSRMF(GeneralRecommender):
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
 
-        # make the neg sample distribution for the 
-        dataset.num('tags')
-
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
