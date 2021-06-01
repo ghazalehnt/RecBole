@@ -87,10 +87,10 @@ class JOINTSRMF(GeneralRecommender):
                 for fi in item_desc_fields:
                     desc = split[fi]
                     for term in desc.split():
-                        if model.vocab.__contains__(term):
-                            wv_term_index = model.vocab.get(term).index
+                        if term in model.key_to_index:
+                            wv_term_index = model.key_to_index[term]
                         else:
-                            wv_term_index = model.vocab.get("unk").index
+                            wv_term_index = model.key_to_index["unk"]
                         if wv_term_index not in self.lm_gt_keys[item_id]:
                             self.lm_gt_keys[item_id].append(wv_term_index)
                             self.lm_gt_values[item_id].append(1)
