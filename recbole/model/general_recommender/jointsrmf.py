@@ -45,28 +45,57 @@ class JOINTSRMF(GeneralRecommender):
 
         # getting the lms:
         # TODO: this should be changed if we could load fields from other atomic files as well
-        item_features = dataset.get_item_feature()
-        self.lm_gt_keys = [[] for i in range(len(item_features))]
-        self.lm_gt_values = [[] for i in range(len(item_features))]
-        for item_description_field in item_description_fields:
-            item_descriptions = item_features[item_description_field]  # [0] is PAD
-            for i in range(1, len(item_descriptions)):
-                for termid in item_descriptions[i]:
-                    if termid > 0: # termid=0 is reserved for padding
-                        term = dataset.id2token(item_description_field, termid)
-                        term = str(term)
-                        term = term.lower()
+        # item_features = dataset.get_item_feature()
+        # self.lm_gt_keys = [[] for i in range(len(item_features))]
+        # self.lm_gt_values = [[] for i in range(len(item_features))]
+        # for item_description_field in item_description_fields:
+        #     item_descriptions = item_features[item_description_field]  # [0] is PAD
+        #     for i in range(1, len(item_descriptions)):
+        #         for termid in item_descriptions[i]:
+        #             if termid > 0: # termid=0 is reserved for padding
+        #                 term = dataset.id2token(item_description_field, termid)
+        #                 term = str(term)
+        #                 term = term.lower()
+        #                 if model.vocab.__contains__(term):
+        #                     wv_term_index = model.vocab.get(term).index
+        #                 else:
+        #                     wv_term_index = model.vocab.get("unk").index
+        #
+        #                 if wv_term_index not in self.lm_gt_keys[i]:
+        #                     self.lm_gt_keys[i].append(wv_term_index)
+        #                     self.lm_gt_values[i].append(1)
+        #                 else:
+        #                     idx = self.lm_gt_keys[i].index(wv_term_index)
+        #                     self.lm_gt_values[i][idx] += 1
+        # self.logger.info(f"Done with lm_gt construction!")
+
+        # since we cannot load the data initially due to the size!!! I am reading the LM here:
+        self.lm_gt_keys = [[] for i in range(self.n_items)]
+        self.lm_gt_values = [[] for i in range(self.n_items)]
+        item_LM_file = os.path.join(dataset.dataset_path, f"{dataset.dataset_name}.item")
+        item_desc_fields = []
+        if "item_description" in item_description_fields:
+            item_desc_fields.append(3)
+        if "item_genres" in item_description_fields:
+            item_desc_fields.append(4)
+        #TODO other fields? e.g. review? have to write another piece of code
+        with open(item_LM_file) as infile:
+            for line in infile:
+                split = line.split("\t")
+                item_id = dataset.token2id("item_id", split[0])
+                for fi in item_desc_fields:
+                    desc = split[fi]
+                    for term in desc.split():
                         if model.vocab.__contains__(term):
                             wv_term_index = model.vocab.get(term).index
                         else:
                             wv_term_index = model.vocab.get("unk").index
-
-                        if wv_term_index not in self.lm_gt_keys[i]:
-                            self.lm_gt_keys[i].append(wv_term_index)
-                            self.lm_gt_values[i].append(1)
+                        if wv_term_index not in self.lm_gt_keys[item_id]:
+                            self.lm_gt_keys[item_id].append(wv_term_index)
+                            self.lm_gt_values[item_id].append(1)
                         else:
-                            idx = self.lm_gt_keys[i].index(wv_term_index)
-                            self.lm_gt_values[i][idx] += 1
+                            idx = self.lm_gt_keys[item_id].index(wv_term_index)
+                            self.lm_gt_values[item_id][idx] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
         self.sigmoid = nn.Sigmoid()
