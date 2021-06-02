@@ -12,6 +12,7 @@ recbole.model.loss
 #######################
 Common Loss in recommender system
 """
+import time
 
 import torch
 import torch.nn as nn
@@ -121,7 +122,10 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
     def forward(self, output, target):
         #s1 = torch.sum(torch.mul(target.T.div(target.sum(1)), torch.sigmoid(output)), 1)
         s1 = torch.sum(torch.mul(target, torch.log(torch.sigmoid(output))), 1)
+        s = time.time()
         neg_samples = self.sample_negs(target)
+        e = time.time()
+        self.logger.info(f"{e - s}s to get negative samples")
         #s2 = torch.sum(torch.mul(neg_samples.T.div(neg_samples.sum(1)).T, torch.log(torch.sigmoid(-1 * output))), 1)
         s2 = torch.sum(torch.mul(neg_samples, torch.log(torch.sigmoid(-1 * output))), 1)
         l = s1 + s2
