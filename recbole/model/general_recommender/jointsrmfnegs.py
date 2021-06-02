@@ -7,6 +7,7 @@ from torch.nn.init import normal_
 import gensim
 import gensim.downloader as api
 import os
+import time
 
 class JOINTSRMFNEGS(GeneralRecommender):
 
@@ -146,7 +147,15 @@ class JOINTSRMFNEGS(GeneralRecommender):
         loss_rec = self.loss_rec(output_rec, label)
 
         output_lm = self.forward_lm(item)# output should be unnormalized counts
-        loss_lm = self.loss_lm(output_lm, self.get_lms(item))
+        s = time.time()
+        gt_lms = self.get_lms(item)
+        e = time.time()
+        self.logger.info(f"{e-s}s to get gt_lms")
+
+        s = time.time()
+        loss_lm = self.loss_lm(output_lm, gt_lms)
+        e = time.time()
+        self.logger.info(f"{e - s}s to calc loss_lm")
 
         return loss_rec, self.alpha * loss_lm
 
