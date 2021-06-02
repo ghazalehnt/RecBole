@@ -121,7 +121,7 @@ class JOINTSRMFNEGS(GeneralRecommender):
         ret = torch.zeros((len(keys), self.vocab_size), device=self.device)
         for k in range(len(keys)):
             for j in range(len(self.lm_gt_keys[k])):
-                ret[k][self.lm_gt_keys[k][j]] = self.lm_gt_keys[k][j]
+                ret[k][self.lm_gt_keys[k][j]] = self.lm_gt_values[k][j]
         return ret
 
     def forward_rec(self, user, item):
