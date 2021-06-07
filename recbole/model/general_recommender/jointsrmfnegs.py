@@ -96,18 +96,28 @@ class JOINTSRMFNEGS(GeneralRecommender):
                     for term in desc.split():
                         if term in model.key_to_index:
                             wv_term_index = model.key_to_index[term]
-                        else:
-                            wv_term_index = model.key_to_index["unk"]
-                        if wv_term_index not in self.lm_gt_keys[item_id]:
-                            self.lm_gt_keys[item_id].append(wv_term_index)
-                            self.lm_gt_values[item_id].append(1)
-                        else:
-                            idx = self.lm_gt_keys[item_id].index(wv_term_index)
-                            self.lm_gt_values[item_id][idx] += 1
-                        if wv_term_index not in noise_dist:
-                            noise_dist[wv_term_index] = 0
-                        noise_dist[wv_term_index] += 1
+                            if wv_term_index not in self.lm_gt_keys[item_id]:
+                                self.lm_gt_keys[item_id].append(wv_term_index)
+                                self.lm_gt_values[item_id].append(1)
+                            else:
+                                idx = self.lm_gt_keys[item_id].index(wv_term_index)
+                                self.lm_gt_values[item_id][idx] += 1
+                            if wv_term_index not in noise_dist:
+                                noise_dist[wv_term_index] = 0
+                            noise_dist[wv_term_index] += 1
         self.logger.info(f"Done with lm_gt construction!")
+
+        keys_sum = 0
+        zeros = 0
+        for lm in self.lm_gt_keys:
+            if len(lm) == 0:
+                zeros += 1
+            else:
+                keys_sum += len(lm)
+        print(keys_sum)
+        print(zeros)
+        print(len(max(self.lm_gt_keys)))
+        exit(1)
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
