@@ -125,7 +125,7 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
         s = time.time()
         neg_samples = self.sample_negs(target)
         e = time.time()
-        self.logger.info(f"{e - s}s to get negative samples")
+        print(f"{e - s}s to get negative samples")
         #s2 = torch.sum(torch.mul(neg_samples.T.div(neg_samples.sum(1)).T, torch.log(torch.sigmoid(-1 * output))), 1)
         s2 = torch.sum(torch.mul(neg_samples, torch.log(torch.sigmoid(-1 * output))), 1)
         l = s1 + s2

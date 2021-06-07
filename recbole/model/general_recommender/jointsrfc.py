@@ -40,7 +40,7 @@ class JOINTSRFC(GeneralRecommender):
             mlp_layers.append(nn.Dropout(p=self.dropout))
             mlp_layers.append(nn.Linear(input_size, self.ff_layers[i]))
             mlp_layers.append(nn.ReLU())
-        mlp_layers.append(torch.nn.Linear(in_features=input_size, out_features=1))
+        mlp_layers.append(torch.nn.Linear(in_features=self.ff_layers[-1], out_features=1))
         mlp_layers.append(nn.Sigmoid())
         self.fc_layers = nn.Sequential(*mlp_layers)
 
