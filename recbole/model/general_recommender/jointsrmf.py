@@ -58,15 +58,12 @@ class JOINTSRMF(GeneralRecommender):
         #                 term = term.lower()
         #                 if model.vocab.__contains__(term):
         #                     wv_term_index = model.vocab.get(term).index
-        #                 else:
-        #                     wv_term_index = model.vocab.get("unk").index
-        #
-        #                 if wv_term_index not in self.lm_gt_keys[i]:
-        #                     self.lm_gt_keys[i].append(wv_term_index)
-        #                     self.lm_gt_values[i].append(1)
-        #                 else:
-        #                     idx = self.lm_gt_keys[i].index(wv_term_index)
-        #                     self.lm_gt_values[i][idx] += 1
+        #                     if wv_term_index not in self.lm_gt_keys[i]:
+        #                         self.lm_gt_keys[i].append(wv_term_index)
+        #                         self.lm_gt_values[i].append(1)
+        #                     else:
+        #                         idx = self.lm_gt_keys[i].index(wv_term_index)
+        #                         self.lm_gt_values[i][idx] += 1
         # self.logger.info(f"Done with lm_gt construction!")
 
         # since we cannot load the data initially due to the size!!! I am reading the LM here:
