@@ -7,6 +7,7 @@ from torch.nn.init import normal_
 import gensim
 import gensim.downloader as api
 import os
+import time
 
 class JOINTSRMF(GeneralRecommender):
 
@@ -96,6 +97,24 @@ class JOINTSRMF(GeneralRecommender):
                                 self.lm_gt_values[item_id][idx] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
+#        keys_sum = 0
+#        zeros = 0
+#        max_len = 0
+#        for lm in self.lm_gt_keys:
+#            if len(lm) == 0:
+#                zeros += 1
+#            else:
+#                keys_sum += len(lm)
+#                if len(lm) > max_len:
+#                    max_len = len(lm)
+#        print(keys_sum)
+#        print(zeros)
+#        print(self.n_items-1-zeros)
+#        print(keys_sum / (self.n_items - zeros))
+#        print(max_len)
+#        print(len(max(self.lm_gt_keys)))
+#        exit(1)
+        
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
@@ -133,6 +152,7 @@ class JOINTSRMF(GeneralRecommender):
         output_rec = self.forward_rec(user, item)
         loss_rec = self.loss_rec(output_rec, label)
 
+#        s = time.time()
         output_lm = self.forward_lm(item) # output should be unnormalized counts
         item_term_keys = self.get_entries(self.lm_gt_keys, item)
         item_term_vals = self.get_entries(self.lm_gt_values, item)
@@ -148,6 +168,8 @@ class JOINTSRMF(GeneralRecommender):
             if item_desc_len > 0:
                 label_lm[i] /= item_desc_len  # labels should be probability distribution
         loss_lm = self.loss_lm(output_lm, label_lm)
+#        e = time.time()
+#        self.logger.info(f"{e - s}s lm_output and loss_lm")
 
         # # when using negative sampling loss:
         # loss_lm = self.loss_lm(output_lm, item_term_keys, item_term_vals)
