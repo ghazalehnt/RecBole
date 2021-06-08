@@ -107,17 +107,22 @@ class JOINTSRMFNEGS(GeneralRecommender):
                             noise_dist[wv_term_index] += 1
         self.logger.info(f"Done with lm_gt construction!")
 
-        keys_sum = 0
-        zeros = 0
-        for lm in self.lm_gt_keys:
-            if len(lm) == 0:
-                zeros += 1
-            else:
-                keys_sum += len(lm)
-        print(keys_sum)
-        print(zeros)
-        print(len(max(self.lm_gt_keys)))
-        exit(1)
+        # keys_sum = 0
+        # zeros = 0
+        # max_len = 0
+        # for lm in self.lm_gt_keys:
+        #     if len(lm) == 0:
+        #         zeros += 1
+        #     else:
+        #         keys_sum += len(lm)
+        #         if len(lm) > max_len:
+        #             max_len = len(lm)
+        # print(keys_sum)
+        # print(zeros)
+        # print(keys_sum / (self.n_items - zeros))
+        # print(max_len)
+        # print(len(max(self.lm_gt_keys)))
+        # exit(1)
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
