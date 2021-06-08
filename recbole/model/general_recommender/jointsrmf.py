@@ -80,7 +80,9 @@ class JOINTSRMF(GeneralRecommender):
             next(infile)
             for line in infile:
                 split = line.split("\t")
-                item_id = dataset.token2id("item_id", split[0])
+                item_id = dataset.token2id_exists("item_id", split[0])
+                if item_id == -1:
+                    continue
                 for fi in item_desc_fields:
                     desc = split[fi]
                     for term in desc.split():
