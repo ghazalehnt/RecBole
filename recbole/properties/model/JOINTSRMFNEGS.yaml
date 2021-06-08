@@ -4,4 +4,4 @@ learning_rate: 0.002
 training_neg_sample_num: 8
 item_description_fields: [tags]
 alpha: 1
-LM_neg_samples: 5
+LM_neg_samples: 500

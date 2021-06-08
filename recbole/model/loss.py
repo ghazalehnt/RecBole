@@ -132,15 +132,27 @@ class SoftCrossEntropyLossByNegSampling(nn.Module):
         total = -1 * torch.mean(l)
         return total
 
+    #  This takes very long time:
+    # def sample_negs(self, target):
+    #     m, n = target.shape
+    #     num_pos = torch.count_nonzero(target, 1)
+    #     num_samples = num_pos * self.num_neg_samples
+    #     all_samples = torch.zeros((m, n), device=self.device)
+    #     for item_idx in range(m):
+    #         sample = np.random.choice(list(self.noise_dist_normalized.keys()), int(num_samples[item_idx]), replace=False, p=list(self.noise_dist_normalized.values()))
+    #         all_samples[item_idx][sample] = 1
+    #     return all_samples
+
     def sample_negs(self, target):
         m, n = target.shape
-        num_pos = torch.count_nonzero(target, 1)
-        num_samples = num_pos * self.num_neg_samples
-        all_samples = torch.zeros((m,n), device=self.device)
-        for item_idx in range(m):
-            sample = np.random.choice(list(self.noise_dist_normalized.keys()), int(num_samples[item_idx]), replace=False, p=list(self.noise_dist_normalized.values()))
-            all_samples[item_idx][sample] = 1
+        all_samples = torch.zeros((m, n), device=self.device)
+
+        sample = np.random.choice(list(self.noise_dist_normalized.keys()), (m, int(self.num_neg_samples)), p=list(self.noise_dist_normalized.values()))
+        for i in range(m):
+            all_samples[i][sample] = 1
+            all_samples[i][target[i].nonzero()] = 0
         return all_samples
+
 
 # # 2-layer HS https://github.com/leimao/Two-Layer-Hierarchical-Softmax-PyTorch/blob/1b65263308b556b5ae038f866cde925095bc0824/utils.py#L98
 # class HierarchicalSoftmax(nn.Module):
