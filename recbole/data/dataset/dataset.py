@@ -1051,11 +1051,32 @@ class Dataset(object):
             if tokens in self.field2token_id[field]:
                 return self.field2token_id[field][tokens]
             else:
-                raise ValueError(f'token [{token}] is not existed in {field}')
+                raise ValueError(f'token [{tokens}] is not existed in {field}')
         elif isinstance(tokens, (list, np.ndarray)):
             return np.array([self.token2id(field, token) for token in tokens])
         else:
-            raise TypeError(f'The type of tokens [{token}] is not supported')
+            raise TypeError(f'The type of tokens [{tokens}] is not supported')
+
+    @dlapi.set()
+    def token2id_exists(self, field, tokens):
+        """Map external tokens to internal ids. Or return -1.
+
+        Args:
+            field (str): Field of external tokens.
+            tokens (str, list or numpy.ndarray): External tokens.
+
+        Returns:
+            int or numpy.ndarray: The internal ids of external tokens.
+        """
+        if isinstance(tokens, str):
+            if tokens in self.field2token_id[field]:
+                return self.field2token_id[field][tokens]
+            else:
+                return -1
+        elif isinstance(tokens, (list, np.ndarray)):
+            return np.array([self.token2id(field, token) if token in self.field2token_id[field] else -1 for token in tokens])
+        else:
+            raise TypeError(f'The type of tokens [{tokens}] is not supported')
 
     @dlapi.set()
     def id2token(self, field, ids):
