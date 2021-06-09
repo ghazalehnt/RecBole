@@ -48,30 +48,6 @@ class JOINTSRMFADAP(GeneralRecommender):
         self.logger.info(f"pretrained_embedding shape: {weights.shape}")
         self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
 
-        # getting the lms:
-        # TODO: this should be changed if we could load fields from other atomic files as well
-        # item_features = dataset.get_item_feature()
-        # self.lm_gt_keys = [[] for i in range(len(item_features))]
-        # self.lm_gt_values = [[] for i in range(len(item_features))]
-        # for item_description_field in item_description_fields:
-        #     item_descriptions = item_features[item_description_field]  # [0] is PAD
-        #     for i in range(1, len(item_descriptions)):
-        #         for termid in item_descriptions[i]:
-        #             if termid > 0: # termid=0 is reserved for padding
-        #                 term = dataset.id2token(item_description_field, termid)
-        #                 term = str(term)
-        #                 term = term.lower()
-        #                 if model.vocab.__contains__(term):
-        #                     wv_term_index = model.vocab.get(term).index
-        #                     if wv_term_index not in self.lm_gt_keys[i]:
-        #                         self.lm_gt_keys[i].append(wv_term_index)
-        #                         self.lm_gt_values[i].append(1)
-        #                     else:
-        #                         idx = self.lm_gt_keys[i].index(wv_term_index)
-        #                         self.lm_gt_values[i][idx] += 1
-        # self.logger.info(f"Done with lm_gt construction!")
-
-        # since we cannot load the data initially due to the size!!! I am reading the LM here:
         self.lm_gt_keys = [[] for i in range(self.n_items)]
         self.lm_gt_values = [[] for i in range(self.n_items)]
         item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
@@ -80,7 +56,7 @@ class JOINTSRMFADAP(GeneralRecommender):
             item_desc_fields.append(3)
         if "item_genres" in item_description_fields:
             item_desc_fields.append(4)
-        #TODO other fields? e.g. review? have to write another piece of code
+        # TODO other fields? e.g. review? have to write another piece of code
         with open(item_LM_file, 'r') as infile:
             next(infile)
             for line in infile:
@@ -155,7 +131,7 @@ class JOINTSRMFADAP(GeneralRecommender):
                 label_lm[i] /= item_desc_len  # labels should be probability distribution
         loss_lm = self.loss_lm(output_lm, label_lm)
         e = time.time()
-        self.logger.info(f"{e - s}s get lm output and loss")
+        self.logger.info(f"{e - s}s lm_output and loss_lm")
 
         # # when using negative sampling loss:
         # loss_lm = self.loss_lm(output_lm, item_term_keys, item_term_vals)
