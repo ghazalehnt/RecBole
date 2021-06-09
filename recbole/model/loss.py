@@ -17,6 +17,8 @@ import time
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.nn import AdaptiveLogSoftmaxWithLoss
+
 
 class BPRLoss(nn.Module):
     """ BPRLoss, based on Bayesian Personalized Ranking
@@ -108,6 +110,15 @@ class SoftCrossEntropyLoss(nn.Module):
     def forward(self, output, target):
         logsoftmax = nn.LogSoftmax(dim=1)
         return torch.mean(torch.sum(- target * logsoftmax(output), 1))
+
+
+class SoftAdaptiveSoftmaxWithLoss(nn.Module):
+    def __init__(self, embedding_dim, vocab_size):
+        self.logsoftmax = AdaptiveLogSoftmaxWithLoss(embedding_dim, vocab_size, cutoffs=[round(vocab_size/15),3*round(vocab_size/15)],div_value=4 )
+
+    def forward(self, output, target):
+        prob, loss = self.logsoftmax(output, target)
+        return torch.mean(torch.sum(- target * prob, 1))
 
 
 class SoftCrossEntropyLossByNegSampling(nn.Module):
