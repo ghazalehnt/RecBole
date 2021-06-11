@@ -75,11 +75,11 @@ class JOINTSRMFSPARSE(GeneralRecommender):
                     indices[0].append(item_id)
                     indices[1].append(k)
                     values.append(v/item_lm_len)
-        self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device) # todo dtype=?
+        self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
+        print(self.lm_gt.dtype)
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
-        exit(-1)
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
@@ -123,28 +123,18 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         #        e = time.time()
         #        self.logger.info(f"{e - s}s output_lm")
 
-        #        s = time.time()
-        item_term_keys = self.lm_gt_keys[item]
-        item_term_vals = self.lm_gt_values[item]
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s get entries")
-
-        # s = time.time()
+        s = time.time()
         label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
-        for i in range(len(item_term_keys)):
-            for j in range(len(item_term_keys[i])):
-                k = int(item_term_keys[i][j])
-                if k == -1:
-                    break
-                v = item_term_vals[i][j]
-                label_lm[i][k] = v
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s make tensor lm")
+        for i in range(len(item)):
+            item_id = item[i]
+            label_lm[i] = self.lm_gt[item_id].to_dense()
+        e = time.time()
+        self.logger.info(f"{e - s}s make tensor lm")
 
-        #        s = time.time()
+        s = time.time()
         loss_lm = self.loss_lm(output_lm, label_lm)
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s loss_lm")
+        e = time.time()
+        self.logger.info(f"{e - s}s loss_lm")
 
         return loss_rec, self.alpha * loss_lm
 
