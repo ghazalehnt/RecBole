@@ -31,3 +31,4 @@ from recbole.model.general_recommender.ncf import NCF
 from recbole.model.general_recommender.jointsrmf import JOINTSRMF
 from recbole.model.general_recommender.jointsrmfnegs import JOINTSRMFNEGS
 from recbole.model.general_recommender.jointsrmfadap import JOINTSRMFADAP
+from recbole.model.general_recommender.jointsrmfsparse import JOINTSRMFSPARSE
