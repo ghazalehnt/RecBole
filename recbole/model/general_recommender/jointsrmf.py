@@ -148,7 +148,7 @@ class JOINTSRMF(GeneralRecommender):
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
-        self.label_lm = torch.zeros(config["train_batch_size"], self.vocab_size, device=self.device)
+        self.label_lm = torch.zeros(config["train_batch_size"]-1, self.vocab_size, device=self.device) # why is it -1?
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
