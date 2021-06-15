@@ -33,3 +33,5 @@ from recbole.model.general_recommender.jointsrmfnegs import JOINTSRMFNEGS
 from recbole.model.general_recommender.jointsrmfadap import JOINTSRMFADAP
 from recbole.model.general_recommender.jointsrmfsparse import JOINTSRMFSPARSE
 from recbole.model.general_recommender.jointsrmfsparserev import JOINTSRMFSPARSEREV
+from recbole.model.general_recommender.jointsrmfrev import JOINTSRMFREV
+
