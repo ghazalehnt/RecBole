@@ -114,6 +114,7 @@ class SoftCrossEntropyLoss(nn.Module):
 
 class SoftAdaptiveSoftmaxWithLoss(nn.Module):
     def __init__(self, embedding_dim, vocab_size):
+        super(SoftAdaptiveSoftmaxWithLoss, self).__init__()
         self.logsoftmax = AdaptiveLogSoftmaxWithLoss(embedding_dim, vocab_size, cutoffs=[round(vocab_size/15),3*round(vocab_size/15)],div_value=4 )
 
     def forward(self, output, target):
