@@ -148,7 +148,6 @@ class JOINTSRMF(GeneralRecommender):
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
-        self.label_lm = torch.zeros(config["train_batch_size"]-1, self.vocab_size, device=self.device) # why is it -1?
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
@@ -195,14 +194,15 @@ class JOINTSRMF(GeneralRecommender):
 #        self.logger.info(f"{e - s}s get entries")
 
         s = time.time()
-        label_lm = self.label_lm.detach().clone()
+        label_lm_temp = torch.zeros(len(item), self.vocab_size)
         for i in range(len(item_term_keys)):
             for j in range(len(item_term_keys[i])):
                 k = int(item_term_keys[i][j])
                 if k == -1:
                     break
                 v = item_term_vals[i][j]
-                label_lm[i][k] = v
+                label_lm_temp[i][k] = v
+        label_lm = label_lm_temp.to(device=self.device)
         e = time.time()
         self.logger.info(f"{e - s}s make tensor lm")
         
