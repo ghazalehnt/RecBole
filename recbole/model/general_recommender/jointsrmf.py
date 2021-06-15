@@ -22,6 +22,10 @@ class JOINTSRMF(GeneralRecommender):
         self.embedding_dim = config['embedding_dimension']
         self.alpha = config["alpha"]
         item_description_fields = config['item_description_fields']
+        if "number_of_reviews_to_use" in config:
+            max_number_of_reviews = config['number_of_reviews_to_use']
+        else:
+            max_number_of_reviews = 1
 
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"alpha = {self.alpha}")
@@ -45,62 +49,106 @@ class JOINTSRMF(GeneralRecommender):
         self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
         self.vocab_size = len(model.key_to_index)
 
-        MAX_LM_SIZE = 702
         s = time.time()
-        self.lm_gt_keys = -1 * torch.ones((self.n_items, MAX_LM_SIZE))
-        self.lm_gt_values = torch.zeros((self.n_items, MAX_LM_SIZE))
-        # self.lm_gt_values = [[] for i in range(self.n_items)]
-        item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+        lm_gt_keys_t = [[] for i in range(self.n_items)]
+        lm_gt_values_t = [[] for i in range(self.n_items)]
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
         if "item_genres" in item_description_fields:
             item_desc_fields.append(4)
-        #TODO other fields? e.g. review? have to write another piece of code
-        with open(item_LM_file, 'r') as infile:
-            next(infile)
-            for line in infile:
-                split = line.split("\t")
-                item_id = dataset.token2id_exists("item_id", split[0])
-                if item_id == -1:
-                    continue
-                if item_id == 0:
-                    print("Isnt that padding?")
-                for fi in item_desc_fields:
-                    desc = split[fi]
-                    for term in desc.split():
-                        if term in model.key_to_index:
-                            wv_term_index = model.key_to_index[term]
-                            key_idx = (self.lm_gt_keys[item_id] == wv_term_index).nonzero(as_tuple=True)[0]
-                            if len(key_idx) == 0:
-                                key_idx = (self.lm_gt_keys[item_id] == -1).nonzero(as_tuple=True)[0]
-                                if len(key_idx) > 0:
-                                    key_idx = key_idx[0]
+        if len(item_desc_fields) > 0:
+            item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+            with open(item_LM_file, 'r') as infile:
+                next(infile)
+                for line in infile:
+                    split = line.split("\t")
+                    item_id = dataset.token2id_exists("item_id", split[0])
+                    if item_id == -1:
+                        continue
+                    if item_id == 0:
+                        print("Isnt that padding?")
+                    for fi in item_desc_fields:
+                        desc = split[fi]
+                        for term in desc.split():
+                            if term in model.key_to_index:
+                                wv_term_index = model.key_to_index[term]
+                                if wv_term_index in lm_gt_keys_t[item_id]:
+                                    key_idx = lm_gt_keys_t[item_id].index(wv_term_index)
+                                    lm_gt_values_t[item_id][key_idx] += 1
                                 else:
-                                    print("no space in the keys!")
-                                    exit(-1)
-                                self.lm_gt_keys[item_id][key_idx] = wv_term_index
-                                self.lm_gt_values[item_id][key_idx] = 1
-                            elif len(key_idx) == 1:
-                                key_idx = key_idx[0]
-                                self.lm_gt_values[item_id][key_idx] += 1
-                            else:
-                                print("term id appeared multiple times!")
-                                exit(-1)
+                                    lm_gt_keys_t[item_id].append(wv_term_index)
+                                    lm_gt_values_t[item_id].append(1)
+
+        if "review" in item_description_fields:
+            num_of_used_revs = {}
+            item_desc_fields = [3]
+            item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.inter")
+            with open(item_LM_file, 'r') as infile:
+                next(infile)
+                for line in infile:
+                    split = line.split("\t")
+                    item_id = dataset.token2id_exists("item_id", split[1])
+                    if item_id == -1:
+                        continue
+                    if item_id == 0:
+                        print("Isnt that padding?")
+                    if item_id not in num_of_used_revs:
+                        num_of_used_revs[item_id] = 0
+                    elif num_of_used_revs[item_id] >= max_number_of_reviews:
+                        continue
+                    for fi in item_desc_fields:
+                        desc = split[fi]
+                        if len(desc) > 1:
+                            num_of_used_revs[item_id] += 1
+                        for term in desc.split():
+                            if term in model.key_to_index:
+                                wv_term_index = model.key_to_index[term]
+                                if term in model.key_to_index:
+                                    wv_term_index = model.key_to_index[term]
+                                    if wv_term_index in lm_gt_keys_t[item_id]:
+                                        key_idx = lm_gt_keys_t[item_id].index(wv_term_index)
+                                        lm_gt_values_t[item_id][key_idx] += 1
+                                    else:
+                                        lm_gt_keys_t[item_id].append(wv_term_index)
+                                        lm_gt_values_t[item_id].append(1)
+
+        keys_sum = 0
+        zeros = 0
+        max_len = 0
+        for lm in lm_gt_keys_t:
+            if len(lm) == 0:
+                zeros += 1
+            else:
+                keys_sum += len(lm)
+                if len(lm) > max_len:
+                    max_len = len(lm)
+        print(keys_sum)
+        print(zeros)
+        print(self.n_items - 1 - zeros)
+        print(keys_sum / (self.n_items - zeros))
+        print(max_len)
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
+
+        MAX_LM_SIZE = max_len + 1
         s = time.time()
+        self.lm_gt_keys = -1 * torch.ones((self.n_items, MAX_LM_SIZE))
+        self.lm_gt_values = torch.zeros((self.n_items, MAX_LM_SIZE))
+        for item_id in range(len(lm_gt_keys_t)):
+            for j in range(len(lm_gt_keys_t[item_id])):
+                self.lm_gt_keys[item_id][j] = lm_gt_keys_t[item_id][j]
+                self.lm_gt_values[item_id][j] = lm_gt_values_t[item_id][j]
         # values should be probabilities
         self.lm_gt_values = (self.lm_gt_values.T / self.lm_gt_values.sum(1)).T
         e = time.time()
-        self.logger.info(f"Done making probabilities!: {e - s}s")
+        self.logger.info(f"Done making tensors and probabilities!: {e - s}s")
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
-        self.label_lm = torch.zeros(config[""], self.vocab_size, device=self.device)
-        self.label_zeros = torch.zeros(config[""], self.vocab_size, device=self.device)
+        self.label_lm = torch.zeros(config["train_batch_size"], self.vocab_size, device=self.device)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
@@ -147,8 +195,7 @@ class JOINTSRMF(GeneralRecommender):
 #        self.logger.info(f"{e - s}s get entries")
 
         s = time.time()
-#         label_lm = self.label_lm.detach().clone()
-        self.label_lm = self.label_lm.multiply(self.label_zeros)
+        self.label_lm = self.label_lm * 0
         for i in range(len(item_term_keys)):
             for j in range(len(item_term_keys[i])):
                 k = int(item_term_keys[i][j])
@@ -160,7 +207,7 @@ class JOINTSRMF(GeneralRecommender):
         self.logger.info(f"{e - s}s make tensor lm")
         
 #        s = time.time()
-        loss_lm = self.loss_lm(output_lm, label_lm)
+        loss_lm = self.loss_lm(output_lm, self.label_lm)
 #        e = time.time()
 #        self.logger.info(f"{e - s}s loss_lm")
 
