@@ -100,7 +100,6 @@ class JOINTSRMF(GeneralRecommender):
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
         self.label_lm = torch.zeros(config[""], self.vocab_size, device=self.device)
-        self.label_zeros = torch.zeros(config[""], self.vocab_size, device=self.device)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Embedding):
@@ -148,7 +147,7 @@ class JOINTSRMF(GeneralRecommender):
 
         s = time.time()
 #         label_lm = self.label_lm.detach().clone()
-        self.label_lm = self.label_lm.multiply(self.label_zeros)
+        self.label_lm = self.label_lm * 0
         for i in range(len(item_term_keys)):
             for j in range(len(item_term_keys[i])):
                 k = int(item_term_keys[i][j])
