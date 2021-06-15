@@ -45,13 +45,9 @@ class JOINTSRMFREV(GeneralRecommender):
         self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
         self.vocab_size = len(model.key_to_index)
 
-        MAX_LM_SIZE = 10000
         s = time.time()
-        self.lm_gt_keys = -1 * torch.ones((self.n_items, MAX_LM_SIZE))
-        self.lm_gt_values = torch.zeros((self.n_items, MAX_LM_SIZE))
-        # self.lm_gt_keys = [[] for i in range(self.n_items)]
-        # self.lm_gt_values = [[] for i in range(self.n_items)]
-        actual_max_size = 0
+        lm_gt_keys_t = [[] for i in range(self.n_items)]
+        lm_gt_values_t = [[] for i in range(self.n_items)]
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
@@ -73,24 +69,13 @@ class JOINTSRMFREV(GeneralRecommender):
                         for term in desc.split():
                             if term in model.key_to_index:
                                 wv_term_index = model.key_to_index[term]
-                                key_idx = (self.lm_gt_keys[item_id] == wv_term_index).nonzero(as_tuple=True)[0]
-                                if len(key_idx) == 0:
-                                    key_idx = (self.lm_gt_keys[item_id] == -1).nonzero(as_tuple=True)[0]
-                                    if len(key_idx) > 0:
-                                        key_idx = key_idx[0]
-                                        if key_idx > actual_max_size:
-                                            actual_max_size = key_idx
-                                    else:
-                                        print("no space in the keys!")
-                                        exit(-1)
-                                    self.lm_gt_keys[item_id][key_idx] = wv_term_index
-                                    self.lm_gt_values[item_id][key_idx] = 1
-                                elif len(key_idx) == 1:
-                                    key_idx = key_idx[0]
-                                    self.lm_gt_values[item_id][key_idx] += 1
+                                if wv_term_index in lm_gt_keys_t[item_id]:
+                                    key_idx = lm_gt_keys_t[item_id].index(wv_term_index)
+                                    lm_gt_values_t[item_id][key_idx] += 1
                                 else:
-                                    print("term id appeared multiple times!")
-                                    exit(-1)
+                                    lm_gt_keys_t[item_id].append(wv_term_index)
+                                    lm_gt_values_t[item_id].append(1)
+
         if "review" in item_description_fields:
             num_of_used_revs = {}
             item_desc_fields = [3]
@@ -106,58 +91,56 @@ class JOINTSRMFREV(GeneralRecommender):
                         print("Isnt that padding?")
                     if item_id not in num_of_used_revs:
                         num_of_used_revs[item_id] = 0
-                    elif num_of_used_revs[item_id] > max_number_of_reviews:
+                    elif num_of_used_revs[item_id] >= max_number_of_reviews:
                         continue
                     for fi in item_desc_fields:
                         desc = split[fi]
+                        if len(desc) > 1:
+                            num_of_used_revs[item_id] += 1
                         for term in desc.split():
                             if term in model.key_to_index:
                                 wv_term_index = model.key_to_index[term]
-                                key_idx = (self.lm_gt_keys[item_id] == wv_term_index).nonzero(as_tuple=True)[0]
-                                if len(key_idx) == 0:
-                                    key_idx = (self.lm_gt_keys[item_id] == -1).nonzero(as_tuple=True)[0]
-                                    if len(key_idx) > 0:
-                                        key_idx = key_idx[0]
-                                        if key_idx > actual_max_size:
-                                            actual_max_size = key_idx
+                                if term in model.key_to_index:
+                                    wv_term_index = model.key_to_index[term]
+                                    if wv_term_index in lm_gt_keys_t[item_id]:
+                                        key_idx = lm_gt_keys_t[item_id].index(wv_term_index)
+                                        lm_gt_values_t[item_id][key_idx] += 1
                                     else:
-                                        print("no space in the keys!")
-                                        exit(-1)
-                                    self.lm_gt_keys[item_id][key_idx] = wv_term_index
-                                    self.lm_gt_values[item_id][key_idx] = 1
-                                elif len(key_idx) == 1:
-                                    key_idx = key_idx[0]
-                                    self.lm_gt_values[item_id][key_idx] += 1
-                                else:
-                                    print("term id appeared multiple times!")
-                                    exit(-1)
-        print(f"Actual max size of desc with max_rev_num {max_number_of_reviews} is {actual_max_size}")
+                                        lm_gt_keys_t[item_id].append(wv_term_index)
+                                        lm_gt_values_t[item_id].append(1)
+
+        keys_sum = 0
+        zeros = 0
+        max_len = 0
+        for lm in lm_gt_keys_t:
+           if len(lm) == 0:
+               zeros += 1
+           else:
+               keys_sum += len(lm)
+               if len(lm) > max_len:
+                   max_len = len(lm)
+        print(keys_sum)
+        print(zeros)
+        print(self.n_items-1-zeros)
+        print(keys_sum / (self.n_items - zeros))
+        print(max_len)
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
+
+        MAX_LM_SIZE = max_len+1
         s = time.time()
+        self.lm_gt_keys = -1 * torch.ones((self.n_items, MAX_LM_SIZE))
+        self.lm_gt_values = torch.zeros((self.n_items, MAX_LM_SIZE))
+        for item_id in lm_gt_keys_t:
+            for j in range(len(lm_gt_keys_t)):
+                self.lm_gt_keys[item_id][j] = lm_gt_keys_t[item_id][j]
+                self.lm_gt_values[item_id][j] = lm_gt_values_t[item_id][j]
         # values should be probabilities
         self.lm_gt_values = (self.lm_gt_values.T / self.lm_gt_values.sum(1)).T
         e = time.time()
-        self.logger.info(f"Done making probabilities!: {e - s}s")
+        self.logger.info(f"Done making tensors and probabilities!: {e - s}s")
 
-        #        keys_sum = 0
-        #        zeros = 0
-        #        max_len = 0
-        #        for lm in self.lm_gt_keys:
-        #            if len(lm) == 0:
-        #                zeros += 1
-        #            else:
-        #                keys_sum += len(lm)
-        #                if len(lm) > max_len:
-        #                    max_len = len(lm)
-        #        print(keys_sum)
-        #        print(zeros)
-        #        print(self.n_items-1-zeros)
-        #        print(keys_sum / (self.n_items - zeros))
-        #        print(max_len)
-        #        print(len(max(self.lm_gt_keys)))
-        #        exit(1)
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
@@ -196,18 +179,18 @@ class JOINTSRMFREV(GeneralRecommender):
         output_rec = self.forward_rec(user, item)
         loss_rec = self.loss_rec(output_rec, label)
 
-        #        s = time.time()
+        s = time.time()
         output_lm = self.forward_lm(item)  # output should be unnormalized counts
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s output_lm")
+        e = time.time()
+        self.logger.info(f"{e - s}s output_lm")
 
-        #        s = time.time()
+        s = time.time()
         item_term_keys = self.lm_gt_keys[item]
         item_term_vals = self.lm_gt_values[item]
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s get entries")
+        e = time.time()
+        self.logger.info(f"{e - s}s get entries")
 
-        # s = time.time()
+        s = time.time()
         label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
         for i in range(len(item_term_keys)):
             for j in range(len(item_term_keys[i])):
@@ -216,13 +199,13 @@ class JOINTSRMFREV(GeneralRecommender):
                     break
                 v = item_term_vals[i][j]
                 label_lm[i][k] = v
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s make tensor lm")
+        e = time.time()
+        self.logger.info(f"{e - s}s make tensor lm")
 
-        #        s = time.time()
+        s = time.time()
         loss_lm = self.loss_lm(output_lm, label_lm)
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s loss_lm")
+        e = time.time()
+        self.logger.info(f"{e - s}s loss_lm")
 
         return loss_rec, self.alpha * loss_lm
 
