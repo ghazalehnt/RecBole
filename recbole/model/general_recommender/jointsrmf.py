@@ -195,19 +195,19 @@ class JOINTSRMF(GeneralRecommender):
 #        self.logger.info(f"{e - s}s get entries")
 
         s = time.time()
-        self.label_lm = self.label_lm * 0
+        label_lm = self.label_lm.detach().clone()
         for i in range(len(item_term_keys)):
             for j in range(len(item_term_keys[i])):
                 k = int(item_term_keys[i][j])
                 if k == -1:
                     break
                 v = item_term_vals[i][j]
-                self.label_lm[i][k] = v
+                label_lm[i][k] = v
         e = time.time()
         self.logger.info(f"{e - s}s make tensor lm")
         
 #        s = time.time()
-        loss_lm = self.loss_lm(output_lm, self.label_lm)
+        loss_lm = self.loss_lm(output_lm, label_lm)
 #        e = time.time()
 #        self.logger.info(f"{e - s}s loss_lm")
 
