@@ -203,8 +203,6 @@ class JOINTSRMF(GeneralRecommender):
                 v = item_term_vals[i][j]
                 label_lm_temp[i][k] = v
         label_lm = label_lm_temp.to(device=self.device)
-
-        label_lm_temp.cuda()
         e = time.time()
         self.logger.info(f"{e - s}s make tensor lm")
         
