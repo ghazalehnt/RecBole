@@ -51,7 +51,8 @@ class JOINTSRMFFULL(GeneralRecommender):
 
         s = time.time()
         self.lm_gt = torch.zeros((self.n_items, self.vocab_size), dtype=torch.uint8)
-        self.lm_gt_len = torch.zeros(self.n_items, dtype=torch.int16)
+        self.lm_gt_len = torch.ones(self.n_items, dtype=torch.int16)
+        items_with_lm = set()
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
@@ -70,6 +71,8 @@ class JOINTSRMFFULL(GeneralRecommender):
                         print("Isnt that padding?")
                     for fi in item_desc_fields:
                         desc = split[fi]
+                        if len(desc.split()) > 0:
+                            items_with_lm.add(item_id)
                         for term in desc.split():
                             if term in model.key_to_index:
                                 wv_term_index = model.key_to_index[term]
@@ -94,7 +97,8 @@ class JOINTSRMFFULL(GeneralRecommender):
                         continue
                     for fi in item_desc_fields:
                         desc = split[fi]
-                        if len(desc) > 1:
+                        if len(desc.split()) > 0:
+                            items_with_lm.add(item_id)
                             num_of_used_revs[item_id] += 1
                         for term in desc.split():
                             if term in model.key_to_index:
@@ -103,6 +107,7 @@ class JOINTSRMFFULL(GeneralRecommender):
                                     wv_term_index = model.key_to_index[term]
                                     self.lm_gt[item_id][wv_term_index] += 1
                                     self.lm_gt_len[item_id] += 1
+        self.lm_gt_len[list(items_with_lm)] -= 1
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
