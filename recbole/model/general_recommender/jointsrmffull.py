@@ -50,7 +50,8 @@ class JOINTSRMFFULL(GeneralRecommender):
         self.vocab_size = len(model.key_to_index)
 
         s = time.time()
-        self.lm_gt = torch.zeros((self.n_items, self.vocab_size), dtype=torch.float32)
+        self.lm_gt = torch.zeros((self.n_items, self.vocab_size), dtype=torch.uint8)
+        self.lm_gt_len = torch.zeros(self.n_items, dtype=torch.int16)
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
@@ -73,6 +74,7 @@ class JOINTSRMFFULL(GeneralRecommender):
                             if term in model.key_to_index:
                                 wv_term_index = model.key_to_index[term]
                                 self.lm_gt[item_id][wv_term_index] += 1
+                                self.lm_gt_len[item_id] += 1
         if "review" in item_description_fields:
             num_of_used_revs = {}
             item_desc_fields = [3]
@@ -100,15 +102,10 @@ class JOINTSRMFFULL(GeneralRecommender):
                                 if term in model.key_to_index:
                                     wv_term_index = model.key_to_index[term]
                                     self.lm_gt[item_id][wv_term_index] += 1
+                                    self.lm_gt_len[item_id] += 1
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
-
-        # values should be probabilities
-        s = time.time()
-        self.lm_gt = (self.lm_gt.T / self.lm_gt.sum(1)).T
-        e = time.time()
-        self.logger.info(f"Done making probabilities!: {e - s}s")
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
@@ -153,7 +150,9 @@ class JOINTSRMFFULL(GeneralRecommender):
 #        self.logger.info(f"{e - s}s output_lm")
 
         s = time.time()
-        label_lm = self.lm_gt[item].to(device=self.device)
+        label_lm_k = self.lm_gt[item].to(device=self.device)
+        label_lm_len = self.lm_gt_len[item].to(device=self.device)
+        label_lm = (label_lm_k.T / label_lm_len).T
         e = time.time()
         self.logger.info(f"{e - s}s make tensor lm in gpu")
 
