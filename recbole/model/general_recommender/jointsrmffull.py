@@ -150,12 +150,12 @@ class JOINTSRMFFULL(GeneralRecommender):
 #        e = time.time()
 #        self.logger.info(f"{e - s}s output_lm")
 
-        s = time.time()
+        # s = time.time()
         label_lm_k = self.lm_gt[item].to(device=self.device)
         label_lm_len = self.lm_gt_len[item].to(device=self.device)
         label_lm = (label_lm_k.T / label_lm_len).T
-        e = time.time()
-        self.logger.info(f"{e - s}s make tensor lm in gpu")
+        # e = time.time()
+        # self.logger.info(f"{e - s}s make tensor lm in gpu")
 
 #        s = time.time()
         loss_lm = self.loss_lm(output_lm, label_lm)
