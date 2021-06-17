@@ -1,3 +1,4 @@
+from scipy.stats import levy_gen
 from torch.autograd import profiler
 
 from recbole.model.abstract_recommender import GeneralRecommender
@@ -74,6 +75,8 @@ class JOINTSRMF(GeneralRecommender):
                     if item_id == 0:
                         print("Isnt that padding?")
                     for fi in item_desc_fields:
+                        if fi >= len(split):
+                            continue
                         desc = split[fi]
                         for term in desc.split():
                             if term in model.key_to_index:

@@ -73,6 +73,8 @@ class JOINTSRMFFULL(GeneralRecommender):
                     if item_id == 0:
                         print("Isnt that padding?")
                     for fi in item_desc_fields:
+                        if fi >= len(split):
+                            continue
                         desc = split[fi]
                         for term in desc.split():
                             if term in model.key_to_index:
