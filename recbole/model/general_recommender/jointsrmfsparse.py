@@ -56,7 +56,8 @@ class JOINTSRMFSPARSE(GeneralRecommender):
             item_desc_fields.append(3)
         if "item_genres" in item_description_fields:
             item_desc_fields.append(4)
-        # TODO other fields? e.g. review? have to write another piece of code
+        if "tags" in item_description_fields:
+            item_desc_fields.append(4)
         if len(item_desc_fields) > 0:
             item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
             with open(item_LM_file, 'r') as infile:

@@ -1,3 +1,5 @@
+from torch.autograd import profiler
+
 from recbole.model.abstract_recommender import GeneralRecommender
 from recbole.model.loss import SoftCrossEntropyLoss#, HierarchicalSoftmax
 from recbole.utils import InputType
@@ -56,6 +58,8 @@ class JOINTSRMFFULL(GeneralRecommender):
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
         if "item_genres" in item_description_fields:
+            item_desc_fields.append(4)
+        if "tags" in item_description_fields:
             item_desc_fields.append(4)
         if len(item_desc_fields) > 0:
             item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
@@ -142,25 +146,27 @@ class JOINTSRMFFULL(GeneralRecommender):
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
 
-        output_rec = self.forward_rec(user, item)
-        loss_rec = self.loss_rec(output_rec, label)
+        with profiler.record_function("REC output and loss"):
+            output_rec = self.forward_rec(user, item)
+            loss_rec = self.loss_rec(output_rec, label)
 
-#        s = time.time()
-        output_lm = self.forward_lm(item) # output should be unnormalized counts
-#        e = time.time()
-#        self.logger.info(f"{e - s}s output_lm")
+        with profiler.record_function("LM output"):
+            output_lm = self.forward_lm(item)
 
-        # s = time.time()
-        label_lm_k = self.lm_gt[item].to(device=self.device)
-        label_lm_len = self.lm_gt_len[item].to(device=self.device)
-        label_lm = (label_lm_k.T / label_lm_len).T
-        # e = time.time()
-        # self.logger.info(f"{e - s}s make tensor lm in gpu")
+        if self.variant == 1:
+            with profiler.record_function("LM making tensor on GPU"):
+                label_lm_k = self.lm_gt[item].to(device=self.device)
+                label_lm_len = self.lm_gt_len[item].to(device=self.device)
+                label_lm = (label_lm_k.T / label_lm_len).T
+        elif self.variant == 2:
+            with profiler.record_function("LM making tensor on CPU"):
+                label_lm_k = self.lm_gt[item]
+                label_lm_len = self.lm_gt_len[item]
+                label_lm_k = label_lm_k.T / label_lm_len
+                label_lm = label_lm_k.to(device=self.device).T
 
-#        s = time.time()
-        loss_lm = self.loss_lm(output_lm, label_lm)
-#        e = time.time()
-#        self.logger.info(f"{e - s}s loss_lm")
+        with profiler.record_function("LM loss"):
+            loss_lm = self.loss_lm(output_lm, label_lm)
 
         return loss_rec, self.alpha * loss_lm
 
