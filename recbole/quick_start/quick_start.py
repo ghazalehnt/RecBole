@@ -58,7 +58,7 @@ def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=Non
         best_valid_score, best_valid_result = trainer.fit(
             train_data, valid_data, saved=saved, show_progress=config['show_progress']
         )
-    print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total', row_limit=5))
+    print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total'))
 
     # model evaluation
     test_result = trainer.evaluate(test_data, load_best_model=saved, show_progress=config['show_progress'])
