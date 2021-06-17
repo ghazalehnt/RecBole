@@ -84,8 +84,10 @@ class JOINTSRMFSPARSE(GeneralRecommender):
                         indices[0].append(item_id)
                         indices[1].append(k)
                         values.append(v/item_lm_len)
-        self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
-        print(self.lm_gt.dtype)
+        if self.variant == 1:
+            self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
+        elif self.variant == 2:
+            self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), dtype=torch.float32)
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
@@ -133,8 +135,7 @@ class JOINTSRMFSPARSE(GeneralRecommender):
 
         if self.variant == 2:
             with profiler.record_function("LM making label on CPU then transfer"):
-                label_lm_t = np.ndarray([self.lm_gt[item[i]].to_dense() for i in range(len(item))])
-                label_lm = torch.from_numpy(label_lm_t).to(device=self.device)
+                label_lm = torch.tensor([[self.lm_gt[item[i]].to_dense() for i in range(len(item))]], device=self.device)
 
         if self.variant == 1:
             with profiler.record_function("LM making label on GPU"):
