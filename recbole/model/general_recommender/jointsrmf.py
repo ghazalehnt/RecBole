@@ -26,6 +26,7 @@ class JOINTSRMF(GeneralRecommender):
             max_number_of_reviews = config['number_of_reviews_to_use']
         else:
             max_number_of_reviews = 1
+        self.variant = config["debug_variant"]
 
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"alpha = {self.alpha}")
@@ -193,38 +194,34 @@ class JOINTSRMF(GeneralRecommender):
 #        e = time.time()
 #        self.logger.info(f"{e - s}s get entries")
 
-        # s = time.time()
-        label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
-        for i in range(len(item_term_keys)):
-            for j in range(len(item_term_keys[i])):
-                k = int(item_term_keys[i][j])
-                if k == -1:
-                    break
-                v = item_term_vals[i][j]
-                label_lm[i][k] = v
-        # e = time.time()
-        # self.logger.info(f"{e - s}s make tensor on gpu")
+        # list comprehension but too complecated
+        if self.variant == 3:
+            label_lm_temp = [[item_term_keys[i][item_term_keys[i].index(k)] if k in item_term_keys[i] else 0 for k in
+                              range(self.vocab_size)] for i in range(len(item_term_keys))]
+            label_lm = torch.tensor(label_lm_temp, device=self.device)
 
-        #        s = time.time()
-#         label_lm_temp = torch.zeros(len(item), self.vocab_size)
-#         for i in range(len(item_term_keys)):
-#             for j in range(len(item_term_keys[i])):
-#                 k = int(item_term_keys[i][j])
-#                 if k == -1:
-#                     break
-#                 v = item_term_vals[i][j]
-#                 label_lm_temp[i][k] = v
-#        e = time.time()
-#        self.logger.info(f"{e - s}s make tensor lm")
-#        s = time.time()
-#         label_lm = label_lm_temp.to(device=self.device)
-#        e = time.time()
-#        self.logger.info(f"{e - s}s transfer to gpu")
-        
-#        s = time.time()
+        if self.variant == 1:
+            label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+            for i in range(len(item_term_keys)):
+                for j in range(len(item_term_keys[i])):
+                    k = int(item_term_keys[i][j])
+                    if k == -1:
+                        break
+                    v = item_term_vals[i][j]
+                    label_lm[i][k] = v
+
+        if self.variant == 2:
+            label_lm_temp = torch.zeros(len(item), self.vocab_size)
+            for i in range(len(item_term_keys)):
+                for j in range(len(item_term_keys[i])):
+                    k = int(item_term_keys[i][j])
+                    if k == -1:
+                        break
+                    v = item_term_vals[i][j]
+                    label_lm_temp[i][k] = v
+            label_lm = label_lm_temp.to(device=self.device)
+
         loss_lm = self.loss_lm(output_lm, label_lm)
-#        e = time.time()
-#        self.logger.info(f"{e - s}s loss_lm")
 
         return loss_rec, self.alpha * loss_lm
 

@@ -23,6 +23,7 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         self.embedding_dim = config['embedding_dimension']
         self.alpha = config["alpha"]
         item_description_fields = config['item_description_fields']
+        self.variant = config["debug_variant"]
 
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"alpha = {self.alpha}")
@@ -130,14 +131,17 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         with profiler.record_function("LM output"):
             output_lm = self.forward_lm(item)
 
-        # label_lm_t = np.ndarray([self.lm_gt[item[i]].to_dense() for i in range(len(item))])
-        # label_lm = torch.from_numpy(label_lm_t).to(device=self.device)
+        if self.variant == 2:
+            with profiler.record_function("LM making label on CPU then transfer"):
+                label_lm_t = np.ndarray([self.lm_gt[item[i]].to_dense() for i in range(len(item))])
+                label_lm = torch.from_numpy(label_lm_t).to(device=self.device)
 
-        with profiler.record_function("LM making label on GPU"):
-            label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
-            for i in range(len(item)):
-                item_id = item[i]
-                label_lm[i] = self.lm_gt[item_id].to_dense()
+        if self.variant == 1:
+            with profiler.record_function("LM making label on GPU"):
+                label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+                for i in range(len(item)):
+                    item_id = item[i]
+                    label_lm[i] = self.lm_gt[item_id].to_dense()
 
         with profiler.record_function("LM loss"):
             loss_lm = self.loss_lm(output_lm, label_lm)
