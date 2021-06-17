@@ -8,6 +8,8 @@ import gensim
 import gensim.downloader as api
 import os
 import time
+import numpy as np
+import torch.autograd.profiler as profiler
 
 class JOINTSRMFSPARSE(GeneralRecommender):
 
@@ -47,34 +49,40 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         s = time.time()
         indices = [[], []]
         values = []
-        item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+
         item_desc_fields = []
         if "item_description" in item_description_fields:
             item_desc_fields.append(3)
         if "item_genres" in item_description_fields:
             item_desc_fields.append(4)
         # TODO other fields? e.g. review? have to write another piece of code
-        with open(item_LM_file, 'r') as infile:
-            next(infile)
-            for line in infile:
-                split = line.split("\t")
-                item_id = dataset.token2id("item_id", split[0])
-                item_lm = {}
-                item_lm_len = 0
-                for fi in item_desc_fields:
-                    desc = split[fi]
-                    for term in desc.split():
-                        if term in model.key_to_index:
-                            wv_term_index = model.key_to_index[term]
-                            if wv_term_index not in item_lm:
-                                item_lm[wv_term_index] = 1
-                            else:
-                                item_lm[wv_term_index] += 1
-                            item_lm_len += 1
-                for k, v in item_lm.items():
-                    indices[0].append(item_id)
-                    indices[1].append(k)
-                    values.append(v/item_lm_len)
+        if len(item_desc_fields) > 0:
+            item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+            with open(item_LM_file, 'r') as infile:
+                next(infile)
+                for line in infile:
+                    split = line.split("\t")
+                    item_id = dataset.token2id_exists("item_id", split[0])
+                    if item_id == -1:
+                        continue
+                    if item_id == 0:
+                        print("Isnt that padding?")
+                    item_lm = {}
+                    item_lm_len = 0
+                    for fi in item_desc_fields:
+                        desc = split[fi]
+                        for term in desc.split():
+                            if term in model.key_to_index:
+                                wv_term_index = model.key_to_index[term]
+                                if wv_term_index not in item_lm:
+                                    item_lm[wv_term_index] = 1
+                                else:
+                                    item_lm[wv_term_index] += 1
+                                item_lm_len += 1
+                    for k, v in item_lm.items():
+                        indices[0].append(item_id)
+                        indices[1].append(k)
+                        values.append(v/item_lm_len)
         self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
         print(self.lm_gt.dtype)
         e = time.time()
@@ -115,26 +123,24 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
 
-        output_rec = self.forward_rec(user, item)
-        loss_rec = self.loss_rec(output_rec, label)
+        with profiler.record_function("REC output and loss"):
+            output_rec = self.forward_rec(user, item)
+            loss_rec = self.loss_rec(output_rec, label)
 
-        #        s = time.time()
-        output_lm = self.forward_lm(item)  # output should be unnormalized counts
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s output_lm")
+        with profiler.record_function("LM output"):
+            output_lm = self.forward_lm(item)
 
-        s = time.time()
-        label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
-        for i in range(len(item)):
-            item_id = item[i]
-            label_lm[i] = self.lm_gt[item_id].to_dense()
-        e = time.time()
-        self.logger.info(f"{e - s}s make tensor lm")
+        # label_lm_t = np.ndarray([self.lm_gt[item[i]].to_dense() for i in range(len(item))])
+        # label_lm = torch.from_numpy(label_lm_t).to(device=self.device)
 
-        s = time.time()
-        loss_lm = self.loss_lm(output_lm, label_lm)
-        e = time.time()
-        self.logger.info(f"{e - s}s loss_lm")
+        with profiler.record_function("LM making label on GPU"):
+            label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+            for i in range(len(item)):
+                item_id = item[i]
+                label_lm[i] = self.lm_gt[item_id].to_dense()
+
+        with profiler.record_function("LM loss"):
+            loss_lm = self.loss_lm(output_lm, label_lm)
 
         return loss_rec, self.alpha * loss_lm
 
