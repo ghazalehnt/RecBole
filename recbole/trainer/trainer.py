@@ -24,6 +24,7 @@ from time import time
 import numpy as np
 import torch
 import torch.optim as optim
+from torch.autograd import profiler
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
 
