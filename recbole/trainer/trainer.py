@@ -24,6 +24,7 @@ from time import time
 import numpy as np
 import torch
 import torch.optim as optim
+from torch.autograd import profiler
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
 
@@ -153,22 +154,25 @@ class Trainer(AbstractTrainer):
                 desc=set_color(f"Train {epoch_idx:>5}", 'pink'),
             ) if show_progress else enumerate(train_data)
         )
-        for batch_idx, interaction in iter_data:
-            interaction = interaction.to(self.device)
-            self.optimizer.zero_grad()
-            losses = loss_func(interaction)
-            if isinstance(losses, tuple):
-                loss = sum(losses)
-                loss_tuple = tuple(per_loss.item() for per_loss in losses)
-                total_loss = loss_tuple if total_loss is None else tuple(map(sum, zip(total_loss, loss_tuple)))
-            else:
-                loss = losses
-                total_loss = losses.item() if total_loss is None else total_loss + losses.item()
-            self._check_nan(loss)
-            loss.backward()
-            if self.clip_grad_norm:
-                clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
-            self.optimizer.step()
+        with profiler.profile(with_stack=True, profile_memory=True) as prof:
+            for batch_idx, interaction in iter_data:
+                with profiler.record_function("INTERACTION transfer"):
+                    interaction = interaction.to(self.device)
+                self.optimizer.zero_grad()
+                losses = loss_func(interaction)
+                if isinstance(losses, tuple):
+                    loss = sum(losses)
+                    loss_tuple = tuple(per_loss.item() for per_loss in losses)
+                    total_loss = loss_tuple if total_loss is None else tuple(map(sum, zip(total_loss, loss_tuple)))
+                else:
+                    loss = losses
+                    total_loss = losses.item() if total_loss is None else total_loss + losses.item()
+                self._check_nan(loss)
+                loss.backward()
+                if self.clip_grad_norm:
+                    clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
+                self.optimizer.step()
+            print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total', row_limit=5))
         return total_loss
 
     def _valid_epoch(self, valid_data, show_progress=False):
