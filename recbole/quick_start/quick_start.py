@@ -54,7 +54,7 @@ def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=Non
     trainer = get_trainer(config['MODEL_TYPE'], config['model'])(config, model)
 
     # model training
-    with profiler.profile(with_stack=True, profile_memory=True) as prof:
+    with profiler.profile(with_stack=True, profile_memory=True, use_cuda=True) as prof:
         best_valid_score, best_valid_result = trainer.fit(
             train_data, valid_data, saved=saved, show_progress=config['show_progress']
         )
