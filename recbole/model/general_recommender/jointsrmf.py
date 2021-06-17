@@ -1,3 +1,5 @@
+from torch.autograd import profiler
+
 from recbole.model.abstract_recommender import GeneralRecommender
 from recbole.model.loss import SoftCrossEntropyLoss#, HierarchicalSoftmax
 from recbole.utils import InputType
@@ -180,48 +182,48 @@ class JOINTSRMF(GeneralRecommender):
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
 
-        output_rec = self.forward_rec(user, item)
-        loss_rec = self.loss_rec(output_rec, label)
+        with profiler.record_function("REC output and loss"):
+            output_rec = self.forward_rec(user, item)
+            loss_rec = self.loss_rec(output_rec, label)
 
-#        s = time.time()
-        output_lm = self.forward_lm(item) # output should be unnormalized counts
-#        e = time.time()
-#        self.logger.info(f"{e - s}s output_lm")
+        with profiler.record_function("LM output"):
+            output_lm = self.forward_lm(item)
 
-#        s = time.time()
-        item_term_keys = self.lm_gt_keys[item]
-        item_term_vals = self.lm_gt_values[item]
-#        e = time.time()
-#        self.logger.info(f"{e - s}s get entries")
+        with profiler.record_function("LM get entries"):
+            item_term_keys = self.lm_gt_keys[item]
+            item_term_vals = self.lm_gt_values[item]
 
-        # list comprehension but too complecated
         if self.variant == 3:
-            label_lm_temp = [[item_term_keys[i][item_term_keys[i].index(k)] if k in item_term_keys[i] else 0 for k in
-                              range(self.vocab_size)] for i in range(len(item_term_keys))]
-            label_lm = torch.tensor(label_lm_temp, device=self.device)
+            with profiler.record_function("LM making tensor list comprehension complex"):
+                label_lm_temp = [[item_term_keys[i][item_term_keys[i].index(k)] if k in item_term_keys[i] else 0 for k in
+                                  range(self.vocab_size)] for i in range(len(item_term_keys))]
+                label_lm = torch.tensor(label_lm_temp, device=self.device)
 
         if self.variant == 1:
-            label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
-            for i in range(len(item_term_keys)):
-                for j in range(len(item_term_keys[i])):
-                    k = int(item_term_keys[i][j])
-                    if k == -1:
-                        break
-                    v = item_term_vals[i][j]
-                    label_lm[i][k] = v
+            with profiler.record_function("LM making tensor loop on GPU"):
+                label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+                for i in range(len(item_term_keys)):
+                    for j in range(len(item_term_keys[i])):
+                        k = int(item_term_keys[i][j])
+                        if k == -1:
+                            break
+                        v = item_term_vals[i][j]
+                        label_lm[i][k] = v
 
         if self.variant == 2:
-            label_lm_temp = torch.zeros(len(item), self.vocab_size)
-            for i in range(len(item_term_keys)):
-                for j in range(len(item_term_keys[i])):
-                    k = int(item_term_keys[i][j])
-                    if k == -1:
-                        break
-                    v = item_term_vals[i][j]
-                    label_lm_temp[i][k] = v
-            label_lm = label_lm_temp.to(device=self.device)
+            with profiler.record_function("LM making tensor loop on CPU"):
+                label_lm_temp = torch.zeros(len(item), self.vocab_size)
+                for i in range(len(item_term_keys)):
+                    for j in range(len(item_term_keys[i])):
+                        k = int(item_term_keys[i][j])
+                        if k == -1:
+                            break
+                        v = item_term_vals[i][j]
+                        label_lm_temp[i][k] = v
+                label_lm = label_lm_temp.to(device=self.device)
 
-        loss_lm = self.loss_lm(output_lm, label_lm)
+        with profiler.record_function("LM loss"):
+            loss_lm = self.loss_lm(output_lm, label_lm)
 
         return loss_rec, self.alpha * loss_lm
 
