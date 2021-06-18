@@ -28,6 +28,7 @@ class JOINTSRMFFULL(GeneralRecommender):
             max_number_of_reviews = config['number_of_reviews_to_use']
         else:
             max_number_of_reviews = 1
+        self.variant = config["debug_variant"]  
 
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"alpha = {self.alpha}")

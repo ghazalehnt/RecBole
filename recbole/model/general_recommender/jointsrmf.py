@@ -1,4 +1,3 @@
-from scipy.stats import levy_gen
 from torch.autograd import profiler
 
 from recbole.model.abstract_recommender import GeneralRecommender
