@@ -142,6 +142,8 @@ class JOINTSRMFFULLDataset(Dataset):
                                 wv_term_index = self.word2vec_model.key_to_index[k]
                                 new_field_lm[i][wv_term_index] += np.uint8(v)
                                 new_field_lm_len[i] += int(v)
+        while 0 in new_field_lm_len:
+            new_field_lm_len[new_field_lm_len.index(0)] = 1
                 # TODO Here we should remove the columnsof there is no space
         self.item_feat[self.LM_FIELD] = new_field_lm
         self.item_feat[self.LM_LEN_FIELD] = new_field_lm_len
