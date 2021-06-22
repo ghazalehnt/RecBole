@@ -498,6 +498,8 @@ class Dataset(object):
                     feat[field].fillna(value=0, inplace=True)
                 elif ftype == FeatureType.FLOAT:
                     feat[field].fillna(value=feat[field].mean(), inplace=True)
+                elif ftype == FeatureType.LM_KEY_VAL_SEQ:
+                    pass # TODO anything?
                 else:
                     dtype = np.int64 if ftype == FeatureType.TOKEN_SEQ else np.float
                     feat[field] = feat[field].apply(lambda x: np.array([], dtype=dtype) if isinstance(x, float) else x)
@@ -1706,4 +1708,9 @@ class Dataset(object):
             elif ftype == FeatureType.FLOAT_SEQ:
                 seq_data = [torch.FloatTensor(d[:self.field2seqlen[k]]) for d in value]
                 new_data[k] = rnn_utils.pad_sequence(seq_data, batch_first=True)
+            elif k == self.LM_FIELD:
+                seq_data = [torch.tensor(d, dtype=torch.uint8) for d in value]
+                new_data[k] = rnn_utils.pad_sequence(seq_data, batch_first=True)
+            elif k == self.LM_LEN_FIELD:
+                new_data[k] = torch.IntTensor(value)
         return Interaction(new_data)
