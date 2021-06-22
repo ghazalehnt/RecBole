@@ -136,7 +136,8 @@ class JOINTSRMFFULLDataset(Dataset):
                     for i in range(1, len(self.item_feat[field].values)):
                         key_vals = self.item_feat[field].values[i]
                         for s in key_vals:
-                            k, v = s.split(",")
+                            k = s[:s.rindex(",")]
+                            v = s[s.rindex(",")+1:]
                             if k in self.word2vec_model.key_to_index:
                                 wv_term_index = self.word2vec_model.key_to_index[k]
                                 new_field_lm[i][wv_term_index] += np.uint8(v)
