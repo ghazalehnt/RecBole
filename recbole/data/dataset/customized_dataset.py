@@ -13,6 +13,7 @@ Customized datasets named ``[Model Name]Dataset`` can be automatically called.
 import numpy as np
 import pandas as pd
 import os
+import copy
 
 import gensim
 import gensim.downloader as api
@@ -151,3 +152,34 @@ class JOINTSRMFFULLDataset(Dataset):
         self.field2seqlen[self.LM_FIELD] = max(map(len, self.item_feat[self.LM_FIELD].values))
         self.field2seqlen[self.LM_LEN_FIELD] = 1
         # this here or before other data processing???
+
+    # def copy_train(self, new_inter_feat):
+    #     """Given a new interaction feature, return a new :class:`Dataset` object,
+    #     whose interaction feature is updated with ``new_inter_feat``, and all the other attributes the same.
+    #
+    #     Args:
+    #         new_inter_feat (Interaction): The new interaction feature need to be updated.
+    #
+    #     Returns:
+    #         :class:`~Dataset`: the new :class:`~Dataset` object, whose interaction feature has been updated.
+    #     """
+    #     item_feat = copy.deepcopy(self.item_feat)
+    #     self._del_col(self.item_feat, self.LM_FIELD)
+    #     self._del_col(self.item_feat, self.LM_LEN_FIELD)
+    #     nxt = copy.copy(self)
+    #     nxt.inter_feat = new_inter_feat
+    #     nxt.item_feat = item_feat
+    #     return nxt
+
+    def build(self, eval_setting):
+        datasets = super().build(eval_setting)
+        datasets[0].join_item_feat = True
+        datasets[1].join_item_feat = False
+        datasets[2].join_item_feat = False
+        return datasets
+
+    def __getitem__(self, index, join=True):
+        if self.join_item_feat:
+            return super().__getitem__(index, join)
+        else:
+            return super().__getitem__(index, False)
