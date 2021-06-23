@@ -1217,7 +1217,7 @@ class Dataset(object):
         info.append(set_color('Remain Fields', 'blue') + f': {list(self.field2type)}')
         return '\n'.join(info)
 
-    def copy(self, new_inter_feat):
+    def copy(self, new_inter_feat, split_idx=None):
         """Given a new interaction feature, return a new :class:`Dataset` object,
         whose interaction feature is updated with ``new_inter_feat``, and all the other attributes the same.
 
@@ -1313,7 +1313,7 @@ class Dataset(object):
 
         self._drop_unused_col()
         next_df = [self.inter_feat[index] for index in next_index]
-        next_ds = [self.copy(_) for _ in next_df]
+        next_ds = [self.copy(next_df[i], i) for i in range(len(next_df))]
         return next_ds
 
     def _split_index_by_leave_one_out(self, grouped_index, leave_one_num):
