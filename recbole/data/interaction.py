@@ -233,13 +233,15 @@ class Interaction(object):
         new_user_len_list = list(np.multiply(self.user_len_list, repeats)) if self.user_len_list else None
         return Interaction(ret, new_pos_len_list, new_user_len_list)
 
-    def update(self, new_inter):
+    def update(self, new_inter, drop_cols=None):
         """Similar to ``dict.update()``
 
         Args:
             new_inter (Interaction): current interaction will be updated by new_inter.
         """
         for k in new_inter.interaction:
+            if drop_cols is not None and k in drop_cols:
+                continue
             self.interaction[k] = new_inter.interaction[k]
         if new_inter.pos_len_list is not None:
             self.pos_len_list = new_inter.pos_len_list
