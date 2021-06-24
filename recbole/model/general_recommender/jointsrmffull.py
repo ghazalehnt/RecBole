@@ -20,8 +20,6 @@ class JOINTSRMFFULL(GeneralRecommender):
         super(JOINTSRMFFULL, self).__init__(config, dataset)
         # load dataset info
         self.LABEL = config['LABEL_FIELD']
-        self.LM_FIELD = config['item_lm_field']
-        self.LM_LEN_FIELD = config['item_lm_len_field']
 
         self.embedding_dim = config['embedding_dimension']
         self.alpha = config["alpha"]
@@ -42,6 +40,80 @@ class JOINTSRMFFULL(GeneralRecommender):
         self.item_bias = nn.Parameter(torch.zeros(self.n_items))
         self.bias = nn.Parameter(torch.zeros(1))
         self.apply(self._init_weights)
+
+        gensim_cache = open('gensim_cache_path', 'r').read().strip()
+        os.environ['GENSIM_DATA_DIR'] = str(gensim_cache)
+        # pretrained_embedding_name = "conceptnet-numberbatch-17-06-300"
+        pretrained_embedding_name = "glove-wiki-gigaword-50" # because the size must be 50 the same as the embedding
+        model_path = api.load(pretrained_embedding_name, return_path=True)
+        model = gensim.models.KeyedVectors.load_word2vec_format(model_path)
+        weights = torch.FloatTensor(model.vectors)  # formerly syn0, which is soon deprecated
+        self.logger.info(f"pretrained_embedding shape: {weights.shape}")
+        self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
+        self.vocab_size = len(model.key_to_index)
+
+        s = time.time()
+        self.lm_gt = torch.zeros((self.n_items, self.vocab_size), dtype=torch.uint8)
+        self.lm_gt_len = torch.ones(self.n_items, dtype=torch.int16)
+        item_desc_fields = []
+        if "item_description" in item_description_fields:
+            item_desc_fields.append(3)
+        if "item_genres" in item_description_fields:
+            item_desc_fields.append(4)
+        if "tags" in item_description_fields:
+            item_desc_fields.append(4)
+        if len(item_desc_fields) > 0:
+            item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.item")
+            with open(item_LM_file, 'r') as infile:
+                next(infile)
+                for line in infile:
+                    split = line.split("\t")
+                    item_id = dataset.token2id_exists("item_id", split[0])
+                    if item_id == -1:
+                        continue
+                    if item_id == 0:
+                        print("Isnt that padding?")
+                    for fi in item_desc_fields:
+                        if fi >= len(split):
+                            continue
+                        desc = split[fi]
+                        for term in desc.split():
+                            if term in model.key_to_index:
+                                wv_term_index = model.key_to_index[term]
+                                self.lm_gt[item_id][wv_term_index] += 1
+                                self.lm_gt_len[item_id] += 1
+        if "review" in item_description_fields:
+            num_of_used_revs = {}
+            item_desc_fields = [3]
+            item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.inter")
+            with open(item_LM_file, 'r') as infile:
+                next(infile)
+                for line in infile:
+                    split = line.split("\t")
+                    item_id = dataset.token2id_exists("item_id", split[1])
+                    if item_id == -1:
+                        continue
+                    if item_id == 0:
+                        print("Isnt that padding?")
+                    if item_id not in num_of_used_revs:
+                        num_of_used_revs[item_id] = 0
+                    elif num_of_used_revs[item_id] >= max_number_of_reviews:
+                        continue
+                    for fi in item_desc_fields:
+                        desc = split[fi]
+                        if len(desc.split()) > 0:
+                            num_of_used_revs[item_id] += 1
+                        for term in desc.split():
+                            if term in model.key_to_index:
+                                wv_term_index = model.key_to_index[term]
+                                if term in model.key_to_index:
+                                    wv_term_index = model.key_to_index[term]
+                                    self.lm_gt[item_id][wv_term_index] += 1
+                                    self.lm_gt_len[item_id] += 1
+        self.lm_gt_len[(self.lm_gt_len == 0).nonzero(as_tuple=True)] = 1
+        e = time.time()
+        self.logger.info(f"{e - s}s")
+        self.logger.info(f"Done with lm_gt construction!")
 
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
@@ -76,8 +148,6 @@ class JOINTSRMFFULL(GeneralRecommender):
         user = interaction[self.USER_ID]
         item = interaction[self.ITEM_ID]
         label = interaction[self.LABEL]
-        item_lm = interaction[self.LM_FIELD]
-        item_lm_len = interaction[self.LM_LEN_FIELD]
 
         with profiler.record_function("REC output and loss"):
             output_rec = self.forward_rec(user, item)
@@ -86,8 +156,17 @@ class JOINTSRMFFULL(GeneralRecommender):
         with profiler.record_function("LM output"):
             output_lm = self.forward_lm(item)
 
-        with profiler.record_function("LM probabilities"):
-            label_lm = (item_lm.T / item_lm_len).T
+        if self.variant == 1:
+            with profiler.record_function("LM making tensor on GPU"):
+                label_lm_k = self.lm_gt[item].to(device=self.device)
+                label_lm_len = self.lm_gt_len[item].to(device=self.device)
+                label_lm = (label_lm_k.T / label_lm_len).T
+        elif self.variant == 2:
+            with profiler.record_function("LM making tensor on CPU"):
+                label_lm_k = self.lm_gt[item]
+                label_lm_len = self.lm_gt_len[item]
+                label_lm_k = label_lm_k.T / label_lm_len
+                label_lm = label_lm_k.to(device=self.device).T
 
         with profiler.record_function("LM loss"):
             loss_lm = self.loss_lm(output_lm, label_lm)

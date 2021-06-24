@@ -91,7 +91,6 @@ class FeatureType(Enum):
     FLOAT = 'float'
     TOKEN_SEQ = 'token_seq'
     FLOAT_SEQ = 'float_seq'
-    LM_KEY_VAL_SEQ = 'lm_key_val_seq'
 
 
 class FeatureSource(Enum):
