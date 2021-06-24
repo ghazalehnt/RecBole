@@ -17,7 +17,6 @@ import copy
 
 import gensim
 import gensim.downloader as api
-from recbole.data.utils import dlapi
 
 from recbole.data.dataset import Kg_Seq_Dataset, Dataset
 from recbole.utils import FeatureType, FeatureSource
@@ -179,27 +178,8 @@ class JOINTSRMFFULLDataset(Dataset):
         datasets[2].join_item_feat = False
         return datasets
 
-    # def __getitem__(self, index, join=True):
-    #     if self.join_item_feat:
-    #         return super().__getitem__(index, join)
-    #     else:
-    #         return super().__getitem__(index, False)
-
-    @dlapi.set()
-    def join(self, df):
-        """Given interaction feature, join user/item feature into it.
-
-        Args:
-            df (Interaction): Interaction feature to be joint.
-
-        Returns:
-            Interaction: Interaction feature after joining operation.
-        """
-        drop_cols = None
-        if self.join_item_feat is False:
-            drop_cols = [self.LM_FIELD, self.LM_LEN_FIELD]
-        if self.user_feat is not None and self.uid_field in df:
-            df.update(self.user_feat[df[self.uid_field]])
-        if self.item_feat is not None and self.iid_field in df:
-            df.update(self.item_feat[df[self.iid_field]], drop_cols)
-        return df
+    def __getitem__(self, index, join=True):
+        if self.join_item_feat:
+            return super().__getitem__(index, join)
+        else:
+            return super().__getitem__(index, False)
