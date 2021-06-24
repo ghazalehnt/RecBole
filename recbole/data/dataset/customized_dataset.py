@@ -154,38 +154,29 @@ class JOINTSRMFFULLDataset(Dataset):
         self.field2seqlen[self.LM_LEN_FIELD] = 1
         # this here or before other data processing???
 
-    def copy(self, new_inter_feat, split_idx=None):
-        """Given a new interaction feature, return a new :class:`Dataset` object,
-        whose interaction feature is updated with ``new_inter_feat``, and all the other attributes the same.
-
-        Args:
-            new_inter_feat (Interaction): The new interaction feature need to be updated.
-
-        Returns:
-            :class:`~Dataset`: the new :class:`~Dataset` object, whose interaction feature has been updated.
-        """
-        # nxt = copy.copy(self)
-        # nxt.inter_feat = new_inter_feat
-        # return nxt
-
-        if split_idx is not None and split_idx == 0:
-            item_feat = copy.deepcopy(self.item_feat)
-        if self.LM_FIELD in self.item_feat:
-            self._del_col(self.item_feat, self.LM_FIELD)
-        if self.LM_LEN_FIELD in self.item_feat:
-            self._del_col(self.item_feat, self.LM_LEN_FIELD)
-        nxt = copy.copy(self)
-        nxt.inter_feat = new_inter_feat
-        if split_idx is not None and split_idx == 0:
-            nxt.item_feat = item_feat
-
-        return nxt
+    # def copy_train(self, new_inter_feat):
+    #     """Given a new interaction feature, return a new :class:`Dataset` object,
+    #     whose interaction feature is updated with ``new_inter_feat``, and all the other attributes the same.
+    #
+    #     Args:
+    #         new_inter_feat (Interaction): The new interaction feature need to be updated.
+    #
+    #     Returns:
+    #         :class:`~Dataset`: the new :class:`~Dataset` object, whose interaction feature has been updated.
+    #     """
+    #     item_feat = copy.deepcopy(self.item_feat)
+    #     self._del_col(self.item_feat, self.LM_FIELD)
+    #     self._del_col(self.item_feat, self.LM_LEN_FIELD)
+    #     nxt = copy.copy(self)
+    #     nxt.inter_feat = new_inter_feat
+    #     nxt.item_feat = item_feat
+    #     return nxt
 
     def build(self, eval_setting):
         datasets = super().build(eval_setting)
-        # datasets[0].join_item_feat = True
-        # datasets[1].join_item_feat = False
-        # datasets[2].join_item_feat = False
+        datasets[0].join_item_feat = True
+        datasets[1].join_item_feat = False
+        datasets[2].join_item_feat = False
         return datasets
 
     # def __getitem__(self, index, join=True):
@@ -194,21 +185,21 @@ class JOINTSRMFFULLDataset(Dataset):
     #     else:
     #         return super().__getitem__(index, False)
 
-    # @dlapi.set()
-    # def join(self, df):
-    #     """Given interaction feature, join user/item feature into it.
-    #
-    #     Args:
-    #         df (Interaction): Interaction feature to be joint.
-    #
-    #     Returns:
-    #         Interaction: Interaction feature after joining operation.
-    #     """
-    #     drop_cols = None
-    #     if self.join_item_feat is False:
-    #         drop_cols = [self.LM_FIELD, self.LM_LEN_FIELD]
-    #     if self.user_feat is not None and self.uid_field in df:
-    #         df.update(self.user_feat[df[self.uid_field]])
-    #     if self.item_feat is not None and self.iid_field in df:
-    #         df.update(self.item_feat[df[self.iid_field]], drop_cols)
-    #     return df
+    @dlapi.set()
+    def join(self, df):
+        """Given interaction feature, join user/item feature into it.
+
+        Args:
+            df (Interaction): Interaction feature to be joint.
+
+        Returns:
+            Interaction: Interaction feature after joining operation.
+        """
+        drop_cols = None
+        if self.join_item_feat is False:
+            drop_cols = [self.LM_FIELD, self.LM_LEN_FIELD]
+        if self.user_feat is not None and self.uid_field in df:
+            df.update(self.user_feat[df[self.uid_field]])
+        if self.item_feat is not None and self.iid_field in df:
+            df.update(self.item_feat[df[self.iid_field]], drop_cols)
+        return df
