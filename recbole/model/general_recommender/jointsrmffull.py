@@ -43,10 +43,6 @@ class JOINTSRMFFULL(GeneralRecommender):
         self.bias = nn.Parameter(torch.zeros(1))
         self.apply(self._init_weights)
 
-        weights = torch.FloatTensor(dataset.dataset.word2vec_model.vectors)
-        self.logger.info(f"pretrained_embedding shape: {weights.shape}")
-        self.word_embedding = nn.Embedding.from_pretrained(weights, freeze=True)
-
         self.sigmoid = nn.Sigmoid()
         self.loss_rec = nn.BCELoss()
         self.loss_lm = SoftCrossEntropyLoss()
