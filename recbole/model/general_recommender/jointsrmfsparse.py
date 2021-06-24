@@ -1,3 +1,5 @@
+from torch_sparse import SparseTensor
+
 from recbole.model.abstract_recommender import GeneralRecommender
 from recbole.model.loss import SoftCrossEntropyLoss#, HierarchicalSoftmax
 from recbole.utils import InputType
@@ -87,10 +89,14 @@ class JOINTSRMFSPARSE(GeneralRecommender):
                         indices[0].append(item_id)
                         indices[1].append(k)
                         values.append(v/item_lm_len)
+
+        self.lm_gt = SparseTensor(row=indices[0], col=indices[1], value=values, sparse_sizes=(self.n_items, len(model.key_to_index)))
         if self.variant == 1:
-            self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
+            self.lm_gt = self.lm_gt.to(self.device)
+            # self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
         elif self.variant == 2:
-            self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), dtype=torch.float32)
+            pass
+            # self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), dtype=torch.float32)
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
@@ -137,15 +143,17 @@ class JOINTSRMFSPARSE(GeneralRecommender):
             output_lm = self.forward_lm(item)
 
         if self.variant == 2:
-            with profiler.record_function("LM making label on CPU then transfer"):
-                label_lm = torch.tensor([[self.lm_gt[item[i]].to_dense() for i in range(len(item))]], device=self.device)
+            label_lm = self.lm_gt[item].to(self.device).to_dense()
+        #     with profiler.record_function("LM making label on CPU then transfer"):
+        #         label_lm = torch.tensor([[self.lm_gt[item[i]].to_dense() for i in range(len(item))]], device=self.device) # error
 
         if self.variant == 1:
             with profiler.record_function("LM making label on GPU"):
-                label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
-                for i in range(len(item)):
-                    item_id = item[i]
-                    label_lm[i] = self.lm_gt[item_id].to_dense()
+                label_lm = self.lm_gt[item].to_dense()
+                # label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+                # for i in range(len(item)):
+                #     item_id = item[i]
+                #     label_lm[i] = self.lm_gt[item_id].to_dense()
 
         with profiler.record_function("LM loss"):
             loss_lm = self.loss_lm(output_lm, label_lm)
