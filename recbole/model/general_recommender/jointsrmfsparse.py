@@ -90,7 +90,7 @@ class JOINTSRMFSPARSE(GeneralRecommender):
                         indices[1].append(k)
                         values.append(v/item_lm_len)
 
-        self.lm_gt = SparseTensor(row=indices[0], col=indices[1], value=values, sparse_sizes=(self.n_items, len(model.key_to_index)))
+        self.lm_gt = SparseTensor(row=torch.tensor(indices[0]), col=torch.tensor(indices[1]), value=torch.tensor(values), sparse_sizes=(self.n_items, len(model.key_to_index)))
         if self.variant == 1:
             self.lm_gt = self.lm_gt.to(self.device)
             # self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
