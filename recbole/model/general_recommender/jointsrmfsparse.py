@@ -142,6 +142,9 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         with profiler.record_function("LM output"):
             output_lm = self.forward_lm(item)
 
+        if self.variant == 3:
+            label_lm = self.lm_gt[item].to_dense().to(self.device)
+
         if self.variant == 2:
             label_lm = self.lm_gt[item].to(self.device).to_dense()
         #     with profiler.record_function("LM making label on CPU then transfer"):
