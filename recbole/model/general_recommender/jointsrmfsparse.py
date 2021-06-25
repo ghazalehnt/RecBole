@@ -25,6 +25,7 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         self.embedding_dim = config['embedding_dimension']
         self.alpha = config["alpha"]
         item_description_fields = config['item_description_fields']
+        max_number_of_reviews = config['number_of_reviews_to_use']
         self.variant = config["debug_variant"]
 
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
@@ -50,8 +51,8 @@ class JOINTSRMFSPARSE(GeneralRecommender):
         self.vocab_size = len(model.key_to_index)
 
         s = time.time()
-        indices = [[], []]
-        values = []
+        item_lms = {}
+        item_lm_len = {}
 
         item_desc_fields = []
         if "item_description" in item_description_fields:
@@ -71,32 +72,66 @@ class JOINTSRMFSPARSE(GeneralRecommender):
                         continue
                     if item_id == 0:
                         print("Isnt that padding?")
-                    item_lm = {}
-                    item_lm_len = 0
+                    if item_id not in item_lms:
+                        item_lms[item_id] = {}
+                        item_lm_len[item_id] = 0
                     for fi in item_desc_fields:
                         if fi >= len(split):
+                            print(split)
                             continue
                         desc = split[fi]
                         for term in desc.split():
                             if term in model.key_to_index:
                                 wv_term_index = model.key_to_index[term]
-                                if wv_term_index not in item_lm:
-                                    item_lm[wv_term_index] = 1
+                                if wv_term_index not in item_lms[item_id]:
+                                    item_lms[item_id][wv_term_index] = 1
                                 else:
-                                    item_lm[wv_term_index] += 1
-                                item_lm_len += 1
-                    for k, v in item_lm.items():
-                        indices[0].append(item_id)
-                        indices[1].append(k)
-                        values.append(v/item_lm_len)
-
+                                    item_lms[item_id][wv_term_index] += 1
+                                item_lm_len[item_id] += 1
+        # Do reviews as well
+        # inter: user_id:token   item_id:token   rating:float    review:token_seq
+        num_of_used_revs = {}
+        if "review" in item_description_fields:
+            item_desc_fields = [3]
+            item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.inter")
+            with open(item_LM_file, 'r') as infile:
+                next(infile)
+                for line in infile:
+                    split = line.split("\t")
+                    item_id = dataset.token2id_exists("item_id", split[1])
+                    if item_id == -1:
+                        continue
+                    if item_id == 0:
+                        print("Isnt that padding?")
+                    if item_id not in num_of_used_revs:
+                        num_of_used_revs[item_id] = 0
+                    if max_number_of_reviews is not None and num_of_used_revs[item_id] >= max_number_of_reviews:
+                        continue
+                    if item_id not in item_lms:
+                        item_lms[item_id] = {}
+                        item_lm_len[item_id] = 0
+                    for fi in item_desc_fields:
+                        desc = split[fi]
+                        if len(desc) > 1:
+                            num_of_used_revs[item_id] += 1
+                        for term in desc.split():
+                            if term in model.key_to_index:
+                                wv_term_index = model.key_to_index[term]
+                                if wv_term_index not in item_lms[item_id]:
+                                    item_lms[item_id][wv_term_index] = 1
+                                else:
+                                    item_lms[item_id][wv_term_index] += 1
+                                item_lm_len[item_id] += 1
+        indices = [[], []]
+        values = []
+        for item_id in item_lms.keys():
+            for k, v in item_lms[item_id].items():
+                indices[0].append(item_id)
+                indices[1].append(k)
+                values.append(v / item_lm_len[item_id])
         self.lm_gt = SparseTensor(row=torch.tensor(indices[0]), col=torch.tensor(indices[1]), value=torch.tensor(values), sparse_sizes=(self.n_items, len(model.key_to_index)))
         if self.variant == 1:
             self.lm_gt = self.lm_gt.to(self.device)
-            # self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
-        elif self.variant == 2:
-            pass
-            # self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), dtype=torch.float32)
         e = time.time()
         self.logger.info(f"{e - s}s")
         self.logger.info(f"Done with lm_gt construction!")
@@ -147,8 +182,6 @@ class JOINTSRMFSPARSE(GeneralRecommender):
 
         if self.variant == 2:
             label_lm = self.lm_gt[item].to(self.device).to_dense()
-        #     with profiler.record_function("LM making label on CPU then transfer"):
-        #         label_lm = torch.tensor([[self.lm_gt[item[i]].to_dense() for i in range(len(item))]], device=self.device) # error
 
         if self.variant == 1:
             with profiler.record_function("LM making label on GPU"):
