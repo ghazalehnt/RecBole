@@ -6,8 +6,6 @@ from recbole.utils import InputType
 import torch.nn as nn
 import torch
 from torch.nn.init import normal_
-import gensim
-import gensim.downloader as api
 import os
 import time
 import numpy as np
@@ -41,6 +39,8 @@ class JOINTSRMFSPARSE(GeneralRecommender):
 
         gensim_cache = open('gensim_cache_path', 'r').read().strip()
         os.environ['GENSIM_DATA_DIR'] = str(gensim_cache)
+        import gensim
+        import gensim.downloader as api
         # pretrained_embedding_name = "conceptnet-numberbatch-17-06-300"
         pretrained_embedding_name = "glove-wiki-gigaword-50" # because the size must be 50 the same as the embedding
         model_path = api.load(pretrained_embedding_name, return_path=True)
