@@ -9,4 +9,5 @@ alpha_item: 1
 alpha_user: 1
 debug_variant: 1
 monitor: False
-number_of_reviews_to_use: ~
+number_of_reviews_to_use_item: ~
+number_of_reviews_to_use_user: ~
