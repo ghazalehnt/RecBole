@@ -4,7 +4,9 @@ learning_rate: 0.002
 training_neg_sample_num: 8
 train_batch_size: 4096
 item_description_fields: [item_description, item_genres]
+user_description_fields: [review]
 alpha_item: 1
+alpha_user: 1
 debug_variant: 1
 monitor: False
 number_of_reviews_to_use: ~
