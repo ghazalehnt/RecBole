@@ -218,7 +218,7 @@ class JOINTSRUSERMF(GeneralRecommender):
         return pred.squeeze()
 
     def forward_lm_user(self, users):
-        user_embs = self.item_embedding(users)
+        user_embs = self.user_embedding(users)
         pred = torch.matmul(user_embs, self.word_embedding.weight.T)
         return pred.squeeze()
 
