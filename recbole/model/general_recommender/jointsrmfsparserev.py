@@ -21,6 +21,7 @@ class JOINTSRMFSPARSEREV(GeneralRecommender):
         self.embedding_dim = config['embedding_dimension']
         self.alpha = config["alpha"]
         item_description_fields = config['item_description_fields']
+        max_number_of_reviews = config['number_of_reviews_to_use']
 
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
         self.logger.info(f"alpha = {self.alpha}")
@@ -69,7 +70,7 @@ class JOINTSRMFSPARSEREV(GeneralRecommender):
                         print("Isnt that padding?")
                     if item_id not in item_lms:
                         item_lms[item_id] = {}
-                    item_lm_len[item_id] = 0
+                        item_lm_len[item_id] = 0
                     for fi in item_desc_fields:
                         desc = split[fi]
                         for term in desc.split():
@@ -82,6 +83,7 @@ class JOINTSRMFSPARSEREV(GeneralRecommender):
                                 item_lm_len[item_id] += 1
         # Do reviews as well
         #inter: user_id:token   item_id:token   rating:float    review:token_seq
+        num_of_used_revs = {}
         if "review" in item_description_fields:
             item_desc_fields = [3]
             item_LM_file = os.path.join(dataset.dataset.dataset_path, f"{dataset.dataset.dataset_name}.inter")
@@ -94,11 +96,17 @@ class JOINTSRMFSPARSEREV(GeneralRecommender):
                         continue
                     if item_id == 0:
                         print("Isnt that padding?")
+                    if item_id not in num_of_used_revs:
+                        num_of_used_revs[item_id] = 0
+                    elif num_of_used_revs[item_id] >= max_number_of_reviews:
+                        continue
                     if item_id not in item_lms:
                         item_lms[item_id] = {}
-                    item_lm_len[item_id] = 0
+                        item_lm_len[item_id] = 0
                     for fi in item_desc_fields:
                         desc = split[fi]
+                        if len(desc) > 1:
+                            num_of_used_revs[item_id] += 1
                         for term in desc.split():
                             if term in model.key_to_index:
                                 wv_term_index = model.key_to_index[term]
@@ -111,7 +119,7 @@ class JOINTSRMFSPARSEREV(GeneralRecommender):
             for k, v in item_lms[item_id].items():
                 indices[0].append(item_id)
                 indices[1].append(k)
-                values.append(v / item_lm_len)
+                values.append(v / item_lm_len[item_id])
         self.lm_gt = torch.sparse_coo_tensor(indices, values, (self.n_items, len(model.key_to_index)), device=self.device, dtype=torch.float32)
         print(self.lm_gt.dtype)
         e = time.time()
@@ -155,23 +163,32 @@ class JOINTSRMFSPARSEREV(GeneralRecommender):
         output_rec = self.forward_rec(user, item)
         loss_rec = self.loss_rec(output_rec, label)
 
-        # s = time.time()
+        s = time.time()
         output_lm = self.forward_lm(item)
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s output_lm")
+        e = time.time()
+        self.logger.info(f"{e - s}s output_lm")
 
-        # s = time.time()
-        label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+#        s = time.time()
+#        label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
+#        for i in range(len(item)):
+#            item_id = item[i]
+#            label_lm[i] = self.lm_gt[item_id].to_dense()
+#        e = time.time()
+#        self.logger.info(f"{e - s}s make tensor")
+        
+        s = time.time()
+        sparse_lm = torch.sparse_coo_tensor(size=(len(item), self.vocab_size), device=self.device)
         for i in range(len(item)):
             item_id = item[i]
-            label_lm[i] = self.lm_gt[item_id].to_dense()
-        #        e = time.time()
-        #        self.logger.info(f"{e - s}s make tensor")
+            sparse_lm[i] = self.lm_gt[item_id]
+        label_lm = sparse_lm.to_dense()
+        e = time.time()
+        self.logger.info(f"{e - s}s make tensor")
 
-        # s = time.time()
+        s = time.time()
         loss_lm = self.loss_lm(output_lm, label_lm)
-        # e = time.time()
-        # self.logger.info(f"{e - s}s loss_lm")
+        e = time.time()
+        self.logger.info(f"{e - s}s loss_lm")
 
         return loss_rec, self.alpha * loss_lm
 

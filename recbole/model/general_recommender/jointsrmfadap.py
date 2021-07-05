@@ -115,11 +115,12 @@ class JOINTSRMFADAP(GeneralRecommender):
         loss_rec = self.loss_rec(output_rec, label)
 
         s = time.time()
-        output_lm = self.forward_lm(item) # output should be unnormalized counts
+        #output_lm = self.forward_lm(item) # output should be unnormalized counts
+        item_emb = self.item_embedding(item)
         item_term_keys = self.get_entries(self.lm_gt_keys, item)
         item_term_vals = self.get_entries(self.lm_gt_values, item)
         # when using the softmax loss, we need to have probability distrubution for labels:
-        label_lm = torch.zeros(len(item), output_lm.shape[1], device=self.device)
+        label_lm = torch.zeros(len(item), self.vocab_size, device=self.device)
         for i in range(len(item_term_keys)):
             item_desc_len = 0
             for j in range(len(item_term_keys[i])):
@@ -129,7 +130,7 @@ class JOINTSRMFADAP(GeneralRecommender):
                 item_desc_len += v
             if item_desc_len > 0:
                 label_lm[i] /= item_desc_len  # labels should be probability distribution
-        loss_lm = self.loss_lm(output_lm, label_lm)
+        loss_lm = self.loss_lm(item_emb, label_lm)
         e = time.time()
         self.logger.info(f"{e - s}s lm_output and loss_lm")
 
