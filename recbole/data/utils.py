@@ -76,14 +76,16 @@ def data_preparation(config, dataset, save=False):
     es = EvalSetting(config)
 
     built_datasets = dataset.build(es)
-    print(len(built_datasets))
     train_dataset, valid_dataset, test_dataset = built_datasets
     phases = ['train', 'valid', 'test']
     sampler = None
     logger = getLogger()
     train_neg_sample_args = config['train_neg_sample_args']
     eval_neg_sample_args = es.neg_sample_args
-
+    eval_neg_sample_args_validation = eval_neg_sample_args.copy()
+    if eval_neg_sample_args['strategy'] == "full":
+        logger.warning("HERE I HARD CODED TO CHANGE VALID STRATEGY!!!! to uniform 10000")
+        eval_neg_sample_args_validation = {'strategy': 'by', 'by': 10000, 'distribution': 'uniform'}
     # Training
     train_kwargs = {
         'config': config,
@@ -133,6 +135,12 @@ def data_preparation(config, dataset, save=False):
         'dl_format': InputType.POINTWISE,
         'shuffle': False,
     }
+    eval_kwargs_validation = {
+        'config': config,
+        'batch_size': config['eval_batch_size'],
+        'dl_format': InputType.POINTWISE,
+        'shuffle': False,
+    }
     valid_kwargs = {'dataset': valid_dataset}
     test_kwargs = {'dataset': test_dataset}
     if eval_neg_sample_args['strategy'] != 'none':
@@ -149,9 +157,10 @@ def data_preparation(config, dataset, save=False):
         else:
             sampler.set_distribution(eval_neg_sample_args['distribution'])
         eval_kwargs['neg_sample_args'] = eval_neg_sample_args
+        eval_kwargs_validation['neg_sample_args'] = eval_neg_sample_args_validation
         valid_kwargs['sampler'] = sampler.set_phase('valid')
         test_kwargs['sampler'] = sampler.set_phase('test')
-    valid_kwargs.update(eval_kwargs)
+    valid_kwargs.update(eval_kwargs_validation)
     test_kwargs.update(eval_kwargs)
 
     dataloader = get_data_loader('evaluation', config, eval_neg_sample_args)
