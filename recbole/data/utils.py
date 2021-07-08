@@ -164,6 +164,7 @@ def data_preparation(config, dataset, save=False):
     test_kwargs.update(eval_kwargs)
 
     dataloader = get_data_loader('evaluation', config, eval_neg_sample_args)
+    dataloader_valid = get_data_loader('evaluation', config, eval_neg_sample_args_validation)
     logger.info(
         set_color('Build', 'pink') + set_color(f' [{dataloader.__name__}]', 'yellow') + ' for ' +
         set_color('[evaluation]', 'yellow') + ' with format ' + set_color(f'[{eval_kwargs["dl_format"]}]', 'yellow')
@@ -175,7 +176,7 @@ def data_preparation(config, dataset, save=False):
         set_color(f'[{eval_kwargs["shuffle"]}]\n', 'yellow')
     )
 
-    valid_data = dataloader(**valid_kwargs)
+    valid_data = dataloader_valid(**valid_kwargs)
     test_data = dataloader(**test_kwargs)
 
     if save:
