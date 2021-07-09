@@ -16,25 +16,34 @@ class MLP(GeneralRecommender):
         self.LABEL = config['LABEL_FIELD']
 
         self.embedding_dim = config['embedding_dimension']
-        # self.reg_weight = config['reg_weight'] # TODO: either remove or we have to implement the regloss function as the RegLoss here does not work for Linear
-        # self.dropout = config["dropout"] #TODO do we want dropout?
-        self.n_layers = config["mlp_n_layers"]
+        self.dropout = config["dropout"]
+        self.ff_layers = config["ff_layers"]
+        self.mlp_variant = config["mlp_variant"]
         self.logger.info(f"embedding_dimension = {self.embedding_dim}")
-        self.logger.info(f"mlp_n_layers = {self.n_layers}")
+        self.logger.info(f"ff_layers = {self.ff_layers}")
+        self.logger.info(f"dropout = {self.dropout}")
+        self.logger.info(f"mlp_variant = {self.mlp_variant}")
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_dim)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_dim)
 
-        # I saw different implementations of this!
+        # there are different implementations, I chose one to input the layer sizes directly as appose to calculating them
         mlp_layers = []
-        input_size = self.embedding_dim * 2
-        for i in range(0, self.n_layers):
-            # mlp_layers.append(nn.Dropout(p=self.dropout)) # here?
-            mlp_layers.append(nn.Linear(input_size, input_size // 2))
+        if self.mlp_variant == "cat":
+            input_size = self.embedding_dim * 2
+        elif self.mlp_variant == "mul":
+            input_size = self.embedding_dim
+        else:
+            raise ValueError(f"mlp_variant = {self.mlp_variant} is not implemented")
+        for i in range(len(self.ff_layers)):
+            if i > 0:
+                input_size = self.ff_layers[i-1]
+            mlp_layers.append(nn.Dropout(p=self.dropout))
+            mlp_layers.append(nn.Linear(input_size, self.ff_layers[i]))
             mlp_layers.append(nn.ReLU())
-            input_size = input_size // 2
+        mlp_layers.append(torch.nn.Linear(in_features=self.ff_layers[-1], out_features=1))
+        mlp_layers.append(nn.Sigmoid())
         self.fc_layers = nn.Sequential(*mlp_layers)
-        self.affine_output = torch.nn.Linear(in_features=input_size, out_features=1)
 
         self.sigmoid = nn.Sigmoid()
         self.loss = nn.BCELoss()
@@ -48,10 +57,12 @@ class MLP(GeneralRecommender):
     def forward(self, user, item):
         user_emb = self.user_embedding(user)
         item_emb = self.item_embedding(item)
-        pred = self.fc_layers(torch.cat([user_emb, item_emb], dim=-1))
-        pred = self.affine_output(pred)
-        pred = self.sigmoid(pred).squeeze()
-        return pred
+        if self.mlp_variant == "cat":
+            pred = self.fc_layers(torch.cat([user_emb, item_emb], dim=-1))
+        elif self.mlp_variant == "mul":
+            pred = torch.mul(user_emb, item_emb)
+            pred = self.fc_layers(pred)
+        return pred.squeeze()
 
     def calculate_loss(self, interaction):
         user = interaction[self.USER_ID]

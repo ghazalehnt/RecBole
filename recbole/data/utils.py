@@ -84,8 +84,8 @@ def data_preparation(config, dataset, save=False):
     eval_neg_sample_args = es.neg_sample_args
     eval_neg_sample_args_validation = eval_neg_sample_args.copy()
     if eval_neg_sample_args['strategy'] == "full":
-        logger.warning("HERE I HARD CODED TO CHANGE VALID STRATEGY!!!! to uniform 10000")
-        eval_neg_sample_args_validation = {'strategy': 'by', 'by': 10000, 'distribution': 'uniform'}
+        logger.warning("HERE I HARD CODED TO CHANGE VALID STRATEGY!!!! to uniform 1000")
+        eval_neg_sample_args_validation = {'strategy': 'by', 'by': 1000, 'distribution': 'uniform'}
     # Training
     train_kwargs = {
         'config': config,
