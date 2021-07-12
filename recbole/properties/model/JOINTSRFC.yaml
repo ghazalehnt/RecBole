@@ -1,5 +1,0 @@
-embedding_dimension: 50
-weight_decay: 1e-08
-dropout: 0.8
-ff_layers: [50, 50]
-training_neg_sample_num: 4
