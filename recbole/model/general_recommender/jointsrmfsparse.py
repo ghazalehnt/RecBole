@@ -122,14 +122,14 @@ class JOINTSRMFSPARSE(GeneralRecommender):
                                 else:
                                     item_lms[item_id][wv_term_index] += 1
                                 item_lm_len[item_id] += 1
-        indices = [[], []]
-        values = []
+        indices = [[0], [0]]
+        values = [0]
         for item_id in item_lms.keys():
             for k, v in item_lms[item_id].items():
                 indices[0].append(item_id)
                 indices[1].append(k)
                 values.append(v / item_lm_len[item_id])
-        self.lm_gt = SparseTensor(row=torch.tensor(indices[0]), col=torch.tensor(indices[1]), value=torch.tensor(values), sparse_sizes=(self.n_items, len(model.key_to_index)))
+        self.lm_gt = SparseTensor(row=torch.tensor(indices[0], dtype=torch.long), col=torch.tensor(indices[1], dtype=torch.long), value=torch.tensor(values), sparse_sizes=(self.n_items, len(model.key_to_index)))
         if self.variant == 1:
             self.lm_gt = self.lm_gt.to(self.device)
         e = time.time()
