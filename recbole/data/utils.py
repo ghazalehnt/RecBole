@@ -241,6 +241,11 @@ def get_data_loader(name, config, neg_sample_args):
     if config['model'] in register_table:
         return register_table[config['model']](name, config, neg_sample_args)
 
+    if config['use_dataset_negatives'] and name == 'train':
+        return GeneralNegFromDatasetDataLoader
+    elif config['use_dataset_negatives'] and name == 'evaluation' and not config['sample_eval_not_train']:
+        return GeneralNegFromDatasetDataLoader
+
     model_type_table = {
         ModelType.GENERAL: 'General',
         ModelType.TRADITIONAL: 'General',
