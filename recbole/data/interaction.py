@@ -312,7 +312,7 @@ class Interaction(object):
         for b, a in zip(by[::-1], ascending[::-1]):
             index = np.argsort(self.interaction[b], kind='stable')
             if not a:
-                index = index[::-1]
+                index = index.__reversed__()
             self._reindex(index)
 
     def add_prefix(self, prefix):

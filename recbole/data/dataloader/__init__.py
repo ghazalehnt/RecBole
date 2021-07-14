@@ -7,3 +7,4 @@ from recbole.data.dataloader.dien_dataloader import *
 from recbole.data.dataloader.knowledge_dataloader import *
 from recbole.data.dataloader.decisiontree_dataloader import *
 from recbole.data.dataloader.user_dataloader import *
+from recbole.data.dataloader.custom_dataloaders import *

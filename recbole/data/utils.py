@@ -95,7 +95,7 @@ def data_preparation(config, dataset, save=False):
         'shuffle': True,
     }
     if train_neg_sample_args['strategy'] != 'none':
-        if dataset.label_field in dataset.inter_feat:
+        if dataset.label_field in dataset.inter_feat and not config["use_bothway_sampler"]:
             raise ValueError(
                 f'`training_neg_sample_num` should be 0 '
                 f'if inter_feat have label_field [{dataset.label_field}].'
@@ -245,6 +245,11 @@ def get_data_loader(name, config, neg_sample_args):
         return GeneralNegFromDatasetDataLoader
     elif config['use_dataset_negatives'] and name == 'evaluation' and not config['sample_eval_not_train']:
         return GeneralNegFromDatasetDataLoader
+
+    if config["use_bothway_sampler"] and name == 'train':
+        return GeneralNegSampleBothWaysDataloader
+    elif config['use_bothway_sampler'] and name == 'evaluation' and not config['sample_eval_not_train']:
+        return GeneralNegSampleBothWaysDataloader
 
     model_type_table = {
         ModelType.GENERAL: 'General',
