@@ -9,10 +9,6 @@ class GeneralNegSampleBothWaysDataloader(GeneralNegSampleDataLoader):
     def __init__(
         self, config, dataset, sampler, neg_sample_args, batch_size=1, dl_format=InputType.POINTWISE, shuffle=False
     ):
-        self.uid_field = dataset.uid_field
-        self.iid_field = dataset.iid_field
-        self.uid_list, self.uid2index, self.uid2items_num = None, None, None
-
         super().__init__(
             config, dataset, sampler, neg_sample_args, batch_size=batch_size, dl_format=dl_format, shuffle=shuffle
         )
@@ -35,13 +31,16 @@ class GeneralNegSampleBothWaysDataloader(GeneralNegSampleDataLoader):
         labels_pos = torch.zeros(pos_inter_num * (self.neg_sample_by + 1))
         labels_pos[:pos_inter_num] = 1
         new_data_pos.update(Interaction({self.label_field: labels_pos}))
-        new_data_neg = inter_feat[neg_idx].repeat(round(self.neg_sample_by / 3) + 1)
-        new_data_neg[self.iid_field][neg_inter_num:] = pos_iids
-        new_data_neg = self.dataset.join(new_data_neg)
-        labels_neg = torch.ones(neg_inter_num * (round(self.neg_sample_by / 3) + 1))
-        labels_neg[:neg_inter_num] = 0
-        new_data_neg.update(Interaction({self.label_field: labels_neg}))
-        new_data = cat_interactions([new_data_pos, new_data_neg])
+        if neg_inter_num > 0:
+            new_data_neg = inter_feat[neg_idx].repeat(round(self.neg_sample_by / 3) + 1)
+            new_data_neg[self.iid_field][neg_inter_num:] = pos_iids
+            new_data_neg = self.dataset.join(new_data_neg)
+            labels_neg = torch.ones(neg_inter_num * (round(self.neg_sample_by / 3) + 1))
+            labels_neg[:neg_inter_num] = 0
+            new_data_neg.update(Interaction({self.label_field: labels_neg}))
+            new_data = cat_interactions([new_data_pos, new_data_neg])
+        else:
+            new_data = cat_interactions([new_data_pos])
         return new_data
 
     def _neg_sample_by_pair_wise_sampling(self, inter_feat, neg_iids):
