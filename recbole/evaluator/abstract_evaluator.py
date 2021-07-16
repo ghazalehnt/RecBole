@@ -69,7 +69,7 @@ class GroupedEvaluator(BaseEvaluator):
         scores_list = torch.split(scores_tensor, user_len_list, dim=0)
         padding_score = pad_sequence(scores_list, batch_first=True, padding_value=-np.inf)  # n_users x items
         if padding_score.shape[1] < max(self.topk):
-            padding_score_new = torch.full((padding_score.shape[0], max(self.topk)), -np.inf)
+            padding_score_new = torch.full((padding_score.shape[0], max(self.topk)), -np.inf, device=padding_score.device)
             padding_score_new[:,:padding_score.shape[1]] = padding_score
             padding_score = padding_score_new
         return padding_score
