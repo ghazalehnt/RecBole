@@ -95,7 +95,7 @@ def data_preparation(config, dataset, save=False):
         'shuffle': True,
     }
     if train_neg_sample_args['strategy'] != 'none':
-        if dataset.label_field in dataset.inter_feat and not config["use_bothway_sampler"]:
+        if dataset.label_field in dataset.inter_feat and not config["train_use_bothway_sampler"]:
             raise ValueError(
                 f'`training_neg_sample_num` should be 0 '
                 f'if inter_feat have label_field [{dataset.label_field}].'
@@ -144,7 +144,7 @@ def data_preparation(config, dataset, save=False):
     valid_kwargs = {'dataset': valid_dataset}
     test_kwargs = {'dataset': test_dataset}
     if eval_neg_sample_args['strategy'] != 'none':
-        if dataset.label_field in dataset.inter_feat and not config["sample_eval_not_train"]:
+        if dataset.label_field in dataset.inter_feat and not config["eval_use_bothway_sampler"]:
             raise ValueError(
                 f'It can not validate with `{es.es_str[1]}` '
                 f'when inter_feat have label_field [{dataset.label_field}].'
@@ -241,14 +241,14 @@ def get_data_loader(name, config, neg_sample_args):
     if config['model'] in register_table:
         return register_table[config['model']](name, config, neg_sample_args)
 
-    if config['use_dataset_negatives'] and name == 'train':
+    if config['train_use_dataset_negatives'] and name == 'train':
         return GeneralNegFromDatasetDataLoader
-    elif config['use_dataset_negatives'] and name == 'evaluation' and not config['sample_eval_not_train']:
+    elif config['eval_use_dataset_negatives'] and name == 'evaluation':
         return GeneralNegFromDatasetDataLoader
 
-    if config["use_bothway_sampler"] and name == 'train':
+    if config["train_use_bothway_sampler"] and name == 'train':
         return GeneralNegSampleBothWaysDataloader
-    elif config['use_bothway_sampler'] and name == 'evaluation' and not config['sample_eval_not_train']:
+    elif config['eval_use_bothway_sampler'] and name == 'evaluation':
         return GeneralNegSampleBothWaysDataloader
 
     model_type_table = {
