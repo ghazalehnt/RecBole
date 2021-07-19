@@ -39,7 +39,7 @@ class MFSimple(GeneralRecommender):
     def forward(self, user, item):
         user_emb = self.user_embedding(user)
         item_emb = self.item_embedding(item)
-        pred = torch.sum(torch.mul(user_emb, item_emb).squeeze(), dim=1) # or torch.diag(torch.matmul(user_emb, item_emb.T))
+        pred = torch.sum(torch.mul(user_emb, item_emb), dim=1) # or torch.diag(torch.matmul(user_emb, item_emb.T))
         pred = pred + self.item_bias[item] + self.user_bias[user]
         pred = pred + self.bias
         pred = self.sigmoid(pred)
