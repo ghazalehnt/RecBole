@@ -45,3 +45,6 @@ class GeneralNegSampleBothWaysDataloader(GeneralNegSampleDataLoader):
 
     def _neg_sample_by_pair_wise_sampling(self, inter_feat, neg_iids):
         NotImplementedError("not implemented")
+
+    def get_pos_len_list(self):
+        NotImplementedError("not implemented")

@@ -54,26 +54,31 @@ class GeneralNegFromDatasetDataLoader(GeneralDataLoader):
     def __init__(self, config, dataset, batch_size=1, dl_format=InputType.POINTWISE, shuffle=False):
         self.uid_field = dataset.uid_field
         self.iid_field = dataset.iid_field
-        self.uid_list, self.uid2index, self.uid2items_num = None, None, None
+        self.uid_list, self.uid2index, self.uid2items_num, self.uid2items_num_pos = None, None, None, None
 
         super().__init__(config, dataset, batch_size=batch_size, dl_format=dl_format, shuffle=shuffle)
 
+# TODO for training we don't have to have all users's stuff in one batch??
     def setup(self):
         uid_field = self.dataset.uid_field
         user_num = self.dataset.user_num
-        self.dataset.sort(by=uid_field, ascending=True)
+        self.dataset.sort(by=[uid_field, "label"], ascending=[True, False])
         self.uid_list = []
-        start, end = dict(), dict()
-        for i, uid in enumerate(self.dataset.inter_feat[uid_field].numpy()):
+        start, end, end_pos = dict(), dict(), dict()
+        for i, uid, l in zip(range(len(self.dataset.inter_feat[uid_field])), self.dataset.inter_feat[uid_field].numpy(), self.dataset.inter_feat["label"].numpy()):
             if uid not in start:
                 self.uid_list.append(uid)
                 start[uid] = i
             end[uid] = i
+            if l == 1:
+                end_pos[uid] = i
         self.uid2index = np.array([None] * user_num)
         self.uid2items_num = np.zeros(user_num, dtype=np.int64)
+        self.uid2items_num_pos = np.zeros(user_num, dtype=np.int64)
         for uid in self.uid_list:
             self.uid2index[uid] = slice(start[uid], end[uid] + 1)
             self.uid2items_num[uid] = end[uid] - start[uid] + 1
+            self.uid2items_num_pos[uid] = end_pos[uid] - start[uid] + 1
         self.uid_list = np.array(self.uid_list)
         self._batch_size_adaptation()
 
@@ -103,8 +108,8 @@ class GeneralNegFromDatasetDataLoader(GeneralDataLoader):
             index = self.uid2index[uid]
             data_list.append(self.dataset[index])
         cur_data = cat_interactions(data_list)
-        pos_len_list = self.uid2items_num[uid_list]
-        user_len_list = pos_len_list
+        pos_len_list = self.uid2items_num_pos[uid_list]
+        user_len_list = self.uid2items_num[uid_list]
         cur_data.set_additional_info(list(pos_len_list), list(user_len_list))
         self.pr += self.step
         return cur_data
@@ -114,7 +119,7 @@ class GeneralNegFromDatasetDataLoader(GeneralDataLoader):
         Returns:
             numpy.ndarray: Number of positive item for each user in a training/evaluating epoch.
         """
-        return self.uid2items_num[self.uid_list]
+        return self.uid2items_num_pos[self.uid_list]
 
     def get_user_len_list(self):
         """
@@ -241,7 +246,7 @@ class GeneralNegSampleDataLoader(NegSampleByMixin, AbstractDataLoader):
         new_data[self.iid_field][pos_inter_num:] = neg_iids
         new_data = self.dataset.join(new_data)
         labels = torch.zeros(pos_inter_num * self.times)
-        labels[:pos_inter_num] = 1.0
+        labels[:pos_inter_num] = 1.0 
         new_data.update(Interaction({self.label_field: labels}))
         return new_data
 
